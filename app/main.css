@@ -1,9 +1,17 @@
 :root {
   cursor: default;
   overflow-wrap: break-word;
-  -webkit-tap-highlight-color: transparent;
+
+  color-scheme: dark dark;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
   text-size-adjust: none;
-  -webkit-text-size-adjust: none;
+
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
 }
 
 *,
@@ -20,6 +28,8 @@ html {
 
 body {
   margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
 }
 
 button,
