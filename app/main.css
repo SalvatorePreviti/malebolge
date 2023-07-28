@@ -1,0 +1,48 @@
+:root {
+  cursor: default;
+  overflow-wrap: break-word;
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+html {
+  overflow: hidden;
+  overscroll-behavior: none;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  margin: 0;
+}
+
+b,
+strong {
+  font-weight: bolder;
+}
+
+small {
+  font-size: 80%;
+}
+
+img,
+svg,
+audio,
+canvas,
+iframe,
+video {
+  vertical-align: middle;
+}
