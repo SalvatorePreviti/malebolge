@@ -1,3 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type UnsafeAny = any;
+
 /** The type of a function that is called when the atom's value changes */
 export type AtomListenerFn = () => void;
 
@@ -14,8 +17,13 @@ export interface AtomSubscribeable {
   sub: AtomSubscribeFn;
 }
 
+export interface ReadonlyAtomValue<T> {
+  /** The current value of the atom */
+  get value(): T;
+}
+
 /** The type of an object that can be subscribed to and has a value */
-export interface ReadonlyAtom<T> extends AtomSubscribeable {
+export interface ReadonlyAtom<T> extends AtomSubscribeable, ReadonlyAtomValue<T> {
   readonly initialized: boolean;
 
   /** An unique version number, that changes every time the value of this atom changes */
@@ -24,10 +32,6 @@ export interface ReadonlyAtom<T> extends AtomSubscribeable {
   /** True if the atom was disposed */
   readonly disposed?: boolean;
 
-  /** The current value of the atom */
-  get value(): T;
-
-  /** The current value of the atom */
   readonly get: AtomGetterFn<T>;
 
   /** Adds a listener to the atom */
@@ -47,7 +51,7 @@ export interface Atom<T> extends ReadonlyAtom<T> {
   /** The current value of the atom */
   readonly set: (newState: T) => boolean;
 
-  readonly update: () => boolean;
+  readonly reset: () => boolean;
 
   readonly dispose: () => boolean;
 }
@@ -70,6 +74,10 @@ const _flushAtomLocalStorage = () => {
     _atomInLocalStoragePending.clear();
   }
 };
+
+export type ValueOfAtom<TAtom extends ReadonlyAtomValue<UnsafeAny>> = TAtom extends ReadonlyAtomValue<infer T>
+  ? T
+  : unknown;
 
 /**
  * An atom is a simple object that has a value and a list of listeners.
@@ -103,7 +111,10 @@ const _flushAtomLocalStorage = () => {
  */
 export const atom = <T>(
   compute: (atom: Atom<T>) => T,
-  dependencies?: Iterable<AtomSubscribeFn | AtomSubscribeable | null | undefined | false | 0 | "">,
+  dependencies?:
+    | readonly (AtomSubscribeFn | AtomSubscribeable | null | undefined | false | 0 | "")[]
+    | null
+    | undefined,
 ): Atom<T> => {
   let state: T | typeof _notInitialized = _notInitialized;
   let self: Atom<T>;
@@ -200,7 +211,7 @@ export const atom = <T>(
     return state as T;
   };
 
-  const update = () => self.set(compute(self));
+  const reset = () => self.set(compute(self));
 
   let unsubscribes: AtomUnsubsribeFn[] | undefined;
 
@@ -238,13 +249,13 @@ export const atom = <T>(
       }
     } finally {
       _flushAtomLocalStorage();
-      update();
+      reset();
     }
 
     return true;
   };
 
-  self = { disposed: false, v: ++_v, initialized: false, sub, get, set, update, dispose } satisfies Omit<
+  self = { disposed: false, v: ++_v, initialized: false, sub, get, set, reset, dispose } satisfies Omit<
     Atom<T>,
     "value"
   > as Atom<T>;
@@ -258,7 +269,7 @@ export const atom = <T>(
           unsubscribes = [];
         }
         unsubscribes.push(
-          (dep as AtomSubscribeable).sub ? (dep as AtomSubscribeable).sub(update) : (dep as AtomSubscribeFn)(update),
+          (dep as AtomSubscribeable).sub ? (dep as AtomSubscribeable).sub(reset) : (dep as AtomSubscribeFn)(reset),
         );
       }
     }
@@ -284,6 +295,12 @@ export interface AtomInLocalStorage<T> extends Atom<T> {
   reload(): boolean;
 }
 
+export interface AtomSerializer<T> {
+  stringify(value: T): string;
+
+  parse(value: string): T;
+}
+
 /**
  *
  * Makes an atom persistent by storing its value in local storage.
@@ -296,12 +313,26 @@ export interface AtomInLocalStorage<T> extends Atom<T> {
  * @param storage The storage to use. If not specified, localStorage is used if available.
  * @returns The atom, with additional functions remove and reload
  */
-export const atomInLocalStorage = <T, TAtom extends Atom<T> = Atom<T>>(
-  key: string,
-  atm: TAtom,
-  storage: AtomGenericStorage | false | null | undefined = typeof localStorage !== "undefined" && localStorage,
-): TAtom & { remove(): void; reload(): boolean } => {
-  if (typeof (atm as unknown as AtomInLocalStorage<T>).remove === "function") {
+export const atomInLocalStorage = <TAtom extends Atom<UnsafeAny>>({
+  key,
+  atom: atm,
+  storage,
+  serializer,
+}: {
+  key: string;
+  atom: TAtom;
+  storage?: AtomGenericStorage | null | undefined;
+  serializer?: AtomSerializer<ValueOfAtom<TAtom>> | undefined;
+}): TAtom & { remove(): void; reload(): boolean } => {
+  if (!serializer) {
+    serializer = JSON;
+  }
+
+  if (storage === undefined) {
+    storage = typeof localStorage !== "undefined" ? localStorage : null;
+  }
+
+  if (typeof (atm as unknown as AtomInLocalStorage<TAtom>).remove === "function") {
     throw new TypeError(key);
   }
 
@@ -309,22 +340,15 @@ export const atomInLocalStorage = <T, TAtom extends Atom<T> = Atom<T>>(
 
   key = `ATOM-${key}`;
 
-  let setting = 0;
-
   const reload = () => {
     if (!storage) {
-      return atm.update();
+      return false;
     }
     _flushAtomLocalStorage();
     const result = false;
     const value = storage.getItem(key);
     if (value) {
-      ++setting;
-      try {
-        atm.set(JSON.parse(value));
-      } catch {
-        --setting;
-      }
+      atm.set(serializer!.parse(value));
     }
     return result;
   };
@@ -338,31 +362,24 @@ export const atomInLocalStorage = <T, TAtom extends Atom<T> = Atom<T>>(
 
   if (storage) {
     const store = () => {
-      ++setting;
-      try {
-        if (!setting) {
-          storage.setItem(key, JSON.stringify(atm.get()));
-        }
-      } finally {
-        --setting;
-      }
+      storage!.setItem(key, serializer!.stringify(atm.get()));
     };
 
     atm.sub(() => {
-      if (setting === 0) {
-        if (!_atomInLocalStoragePending) {
-          _atomInLocalStoragePending = new Set();
-        }
-        _atomInLocalStoragePending.add(store);
-        if (!_atomInLocalStorageThrottle) {
-          _atomInLocalStorageThrottle = setTimeout(_flushAtomLocalStorage, atomInLocalStorage.throttle);
-        }
+      if (!_atomInLocalStoragePending) {
+        _atomInLocalStoragePending = new Set();
+      }
+      _atomInLocalStoragePending.add(store);
+      if (!_atomInLocalStorageThrottle) {
+        _atomInLocalStorageThrottle = setTimeout(_flushAtomLocalStorage, atomInLocalStorage.throttle);
       }
     });
   }
 
-  (atm as unknown as AtomInLocalStorage<T>).remove = remove;
-  (atm as unknown as AtomInLocalStorage<T>).reload = reload;
+  (atm as unknown as AtomInLocalStorage<TAtom>).remove = remove;
+  (atm as unknown as AtomInLocalStorage<TAtom>).reload = reload;
+
+  reload();
 
   return atm as TAtom & { remove(): void; reload(): boolean };
 };

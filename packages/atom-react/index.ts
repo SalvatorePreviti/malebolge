@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import type { ConsumerProps, FC, ReactNode } from "react";
 
 export interface ReactAtom<T> {
@@ -59,6 +59,7 @@ export const newAtomSelectorHook = <T, U>(
   selector: (value: T) => U,
 ): AtomSelectorHook<U> => {
   const get = () => selector(getter());
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const self = () => useSyncExternalStore(sub, get);
   self.get = get;
   return self;
@@ -125,3 +126,17 @@ export type AtomSelectorConsumer<T, U> = FC<AtomSelectorConsumerProps<T, U>>;
  */
 export const AtomSelectorConsumer = <T, U>({ atom, selector, children }: AtomSelectorConsumerProps<T, U>): ReactNode =>
   children(useAtomSelector(atom, selector));
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type UnsafeAny = any;
+
+export const useMemoedFn = <TFn extends (...args: UnsafeAny[]) => UnsafeAny>(fn: TFn): TFn => {
+  const ref = useRef<UnsafeAny>(null);
+  let memoedFn = ref.current;
+  if (!memoedFn) {
+    memoedFn = ((...args: UnsafeAny[]) => ref.current.fn(...args)) as UnsafeAny;
+    memoedFn.fn = fn;
+    ref.current = memoedFn;
+  }
+  return memoedFn;
+};

@@ -1,0 +1,18 @@
+.left-toolbar {
+  background-color: red;
+  display: flex;
+  justify-content: stretch;
+}
+
+.left-toolbar__body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The handle is a vertical line on the right of the toolbar */
+.left-toolbar__handle {
+  background-color: blue;
+  width: 20px;
+  height: 100%;
+}
