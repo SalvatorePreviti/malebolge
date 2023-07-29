@@ -1,6 +1,7 @@
 {
   "extends": ["@balsamic"],
   "rules": {
-    "node/no-unpublished-require": 0
+    "node/no-unpublished-require": 0,
+    "react/no-unknown-property": ["error", { "ignore": ["css"] }]
   }
 }

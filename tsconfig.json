@@ -1,6 +1,8 @@
 {
-  "extends": "@balsamic/eslint-config/tsconfig.json",
+  "extends": "@balsamic/tsn/tsconfig.json",
   "compilerOptions": {
-    "alwaysStrict": false
+    "alwaysStrict": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@emotion/react"
   }
 }

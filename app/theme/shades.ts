@@ -1,3 +1,19 @@
+export interface Shade {
+  x10: string;
+  x25: string;
+  x50: string;
+  x100: string;
+  x200: string;
+  x300: string;
+  x400: string;
+  x500: string;
+  x600: string;
+  x700: string;
+  x800: string;
+  x900: string;
+  x999: string;
+}
+
 export const Shades = {
   neutral: {
     x10: "#F9F9FA",
@@ -173,24 +189,14 @@ export const Shades = {
   lightWhite: "rgba(255, 255, 255, 0.54)",
 };
 
-// export interface Shade {
-//   x10: string;
-//   x25: string;
-//   x50: string;
-//   x100: string;
-//   x200: string;
-//   x300: string;
-//   x400: string;
-//   x500: string;
-//   x600: string;
-//   x700: string;
-//   x800: string;
-//   x900: string;
-//   x999: string;
-// }
+export interface ShadeVariants {
+  light: string;
+  main: string;
+  dark: string;
+}
 
-// export interface ShadeVariants {
-//   light: string;
-//   main: string;
-//   dark: string;
-// }
+export const shadeVariants = (shade: Shade): ShadeVariants => ({
+  light: shade.x100,
+  main: shade.x500,
+  dark: shade.x900,
+});

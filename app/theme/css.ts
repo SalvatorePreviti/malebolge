@@ -1,11 +1,10 @@
-import type { CSSProperties } from "@linaria/core";
-import { css } from "@linaria/core";
+import { css } from "@emotion/react";
+import type { CSSObject } from "@emotion/styled";
 import { ThemeColors } from "./colors";
-import { XXX } from "./xxx";
 
-const buildCssVars = (values: Record<string, unknown>): CSSProperties => {
+const buildCssVars = (values: Record<string, unknown>): CSSObject => {
   const stack = Object.entries(values).reverse();
-  const target: CSSProperties = {};
+  const target: CSSObject = {};
   while (stack.length > 0) {
     const [k, v] = stack.pop()!;
     if (typeof v === "object" && v !== null) {
@@ -20,13 +19,8 @@ const buildCssVars = (values: Record<string, unknown>): CSSProperties => {
   return target;
 };
 
-const xThemeColors = {
-  XXX,
-  // ...ThemeColors,
-};
-
 const cssVars = buildCssVars({
-  color: xThemeColors,
+  color: ThemeColors,
 });
 
 export const themeCssVariables = css`

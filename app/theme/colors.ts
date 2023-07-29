@@ -1,4 +1,4 @@
-import { Shades } from "./shades";
+import { Shades, shadeVariants } from "./shades";
 
 export const ThemeShades = {
   primary: Shades.indigo,
@@ -9,17 +9,17 @@ export const ThemeShades = {
   success: Shades.green,
 };
 
-// const ThemeShadeVariants = {
-//   primary: shadeVariants(ThemeShades.primary),
-//   secondary: shadeVariants(ThemeShades.secondary),
-//   error: shadeVariants(ThemeShades.error),
-//   warning: shadeVariants(ThemeShades.warning),
-//   info: shadeVariants(ThemeShades.info),
-//   success: shadeVariants(ThemeShades.success),
-// };
+const ThemeShadeVariants = {
+  primary: shadeVariants(ThemeShades.primary),
+  secondary: shadeVariants(ThemeShades.secondary),
+  error: shadeVariants(ThemeShades.error),
+  warning: shadeVariants(ThemeShades.warning),
+  info: shadeVariants(ThemeShades.info),
+  success: shadeVariants(ThemeShades.success),
+};
 
 export const ThemeColors = {
-  // ...ThemeShadeVariants,
+  ...ThemeShadeVariants,
 
   text: ThemeShades.primary.x300,
   bodyBg: ThemeShades.secondary.x900,
