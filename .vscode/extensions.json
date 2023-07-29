@@ -5,6 +5,9 @@
     "eamodio.gitlens",
     "esbenp.prettier-vscode",
     "pflannery.vscode-versionlens",
-    "visualstudioexptteam.vscodeintellicode"
+    "visualstudioexptteam.vscodeintellicode",
+    "mgmcdermott.vscode-language-babel",
+    "stylelint.vscode-stylelint",
+    "kamikillerto.vscode-colorize"
   ]
 }

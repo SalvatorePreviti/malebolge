@@ -1,3 +1,6 @@
 {
-  "extends": ["@balsamic"]
+  "extends": ["@balsamic"],
+  "rules": {
+    "node/no-unpublished-require": 0
+  }
 }

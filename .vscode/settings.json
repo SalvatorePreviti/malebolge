@@ -95,5 +95,10 @@
   "typescript.tsdk": "node_modules/typescript/lib",
   "[svg]": {
     "editor.defaultFormatter": "jock.svg"
-  }
+  },
+  "extensions.ignoreRecommendations": false,
+
+  "stylelint.configFile": "stylelint.config.cjs",
+  "stylelint.validate": ["typescriptreact", "css", "postcss", "less", "scss", "sass"],
+  "colorize.languages": ["typescript", "javascript", "css", "scss"]
 }
