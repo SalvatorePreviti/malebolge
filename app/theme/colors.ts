@@ -1,10 +1,10 @@
 import { Shades, shadeVariants } from "./shades";
 
 export const ThemeShades = {
-  primary: Shades.indigo,
+  primary: Shades.primary,
   neutral: Shades.neutral,
   error: Shades.rose,
-  warning: Shades.orange,
+  warning: Shades.amber,
   info: Shades.teal,
   success: Shades.green,
 };

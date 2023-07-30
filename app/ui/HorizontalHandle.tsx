@@ -215,7 +215,7 @@ export const HorizontalHandleCss = css`
       background-color: ${Shades.neutral.x600};
 
       &::before {
-        border-color: ${Shades.indigo.x600};
+        border-color: ${Shades.primary.x600};
       }
     }
   }
