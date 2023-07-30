@@ -1,6 +1,7 @@
 import type { CSSObject } from "@emotion/styled";
 
 import { ThemeColors } from "./colors";
+import { ThemeTypo } from "./fonts";
 
 export const buildCssVars = (values: Record<string, unknown>): CSSObject => {
   const stack = Object.entries(values).reverse();
@@ -21,4 +22,5 @@ export const buildCssVars = (values: Record<string, unknown>): CSSObject => {
 
 export const themeCssVars = buildCssVars({
   color: ThemeColors,
+  font: ThemeTypo,
 });

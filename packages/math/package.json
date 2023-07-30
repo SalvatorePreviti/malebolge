@@ -1,0 +1,16 @@
+{
+  "name": "@gravitas/math",
+  "version": "0.0.0",
+  "description": "Math",
+  "main": "index.js",
+  "author": "Salvatore Previti",
+  "license": "MIT",
+  "private": true,
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "keywords": [
+    "@gravitas/math"
+  ]
+}

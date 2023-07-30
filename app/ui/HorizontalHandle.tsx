@@ -153,8 +153,6 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
 };
 
 export const HorizontalHandleCss = css`
-  flex-shrink: 0;
-  width: 6px;
   position: relative;
   cursor: col-resize;
 

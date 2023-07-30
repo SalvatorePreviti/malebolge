@@ -8,6 +8,22 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-size-adjust: 100%;
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  color: var(--color-text);
+}
+
+pre,
+code {
+  font-family: var(--font-mono);
+}
+
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: var(--font-mono);
 }
 
 *,

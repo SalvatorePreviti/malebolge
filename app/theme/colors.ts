@@ -17,7 +17,7 @@ export const ThemeColors = {
   info: shadeVariants(ThemeShades.info),
   success: shadeVariants(ThemeShades.success),
 
-  text: ThemeShades.primary.x300,
+  text: ThemeShades.primary.x10,
   bodyBg: ThemeShades.neutral.x900,
   heading: ThemeShades.primary.x10,
   muted: ThemeShades.primary.x400,

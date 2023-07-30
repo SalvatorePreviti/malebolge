@@ -284,6 +284,8 @@ export const Shades = {
   },
 
   blue: {
+    x10: "#F6F6FE",
+    x25: "#F6F6FE",
     x50: "#e3f2fd",
     x100: "#bbdefb",
     x200: "#90caf9",

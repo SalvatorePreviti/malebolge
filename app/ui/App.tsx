@@ -3,12 +3,8 @@ import type { FC } from "react";
 
 import { themeCssVars } from "../theme/css";
 import { Shades } from "../theme/shades";
+import { AppMain } from "./AppMain";
 import { LeftToolbar } from "./LeftToolbar";
-
-const AppMainStyle = css`
-  background-color: ${Shades.tuna};
-  flex-grow: 1;
-`;
 
 const appGlobalCss = css`
   :root {
@@ -28,7 +24,7 @@ export const App: FC = () => {
     <>
       <Global styles={appGlobalCss} />
       <LeftToolbar />
-      <div css={AppMainStyle}>APP MAIN</div>
+      <AppMain />
     </>
   );
 };
