@@ -61,7 +61,7 @@ export const LeftToolbar: FC = () => {
     >
       <div css={LeftToolbarBodyCss}>
         <div css={LeftToolbarHeader}>
-          <img src="/public/favico.svg" alt="gravitas logo" width={16} height={16} />
+          <img src="/favico.svg" alt="gravitas logo" width={16} height={16} />
           <b>gravitas</b>
         </div>
         <FpsGraph />

@@ -73,7 +73,7 @@ export const FpsGraph: FC = () => {
           fpsGraph.clearGraph();
         }
 
-        fpsGraph.drawText("FPS:" + fps.toFixed(2).padStart(7));
+        fpsGraph.drawText("FPS" + fps.toFixed(2).padStart(7));
         fpsGraph.updateGraph(fps, maxFps);
         fpsTime = time;
         fpsFrames = 0;
@@ -82,7 +82,7 @@ export const FpsGraph: FC = () => {
       if (time >= msDisplayTime + 250) {
         msDisplayTime = time;
         msGraph.updateGraph(durationMs, 40);
-        msGraph.drawText("frame:" + durationMs.toFixed(2).padStart(7) + "ms");
+        msGraph.drawText(" ms" + durationMs.toFixed(2).padStart(7));
         durationMs = 0;
       }
 
