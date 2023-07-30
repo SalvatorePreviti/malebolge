@@ -1,7 +1,7 @@
-import { defineConfig } from "vite";
 import vitePlugin_react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
-const isTsFileRegex = /^.*\.ts(?:x|)(?:[?#].*)?$/;
+const isTsFileRegex = /^(?!.*\/node_modules\/).*\.ts(?:x|)(?:[?#].*)?$/;
 
 // https://vitejs.dev/config/
 export default defineConfig({

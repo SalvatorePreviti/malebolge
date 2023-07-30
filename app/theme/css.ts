@@ -1,8 +1,8 @@
-import { css } from "@emotion/react";
 import type { CSSObject } from "@emotion/styled";
+
 import { ThemeColors } from "./colors";
 
-const buildCssVars = (values: Record<string, unknown>): CSSObject => {
+export const buildCssVars = (values: Record<string, unknown>): CSSObject => {
   const stack = Object.entries(values).reverse();
   const target: CSSObject = {};
   while (stack.length > 0) {
@@ -19,14 +19,6 @@ const buildCssVars = (values: Record<string, unknown>): CSSObject => {
   return target;
 };
 
-const cssVars = buildCssVars({
+export const themeCssVars = buildCssVars({
   color: ThemeColors,
 });
-
-export const themeCssVariables = css`
-  :global() {
-    :root {
-      ${cssVars}
-    }
-  }
-`;

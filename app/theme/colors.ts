@@ -2,33 +2,29 @@ import { Shades, shadeVariants } from "./shades";
 
 export const ThemeShades = {
   primary: Shades.indigo,
-  secondary: Shades.neutral,
+  neutral: Shades.neutral,
   error: Shades.rose,
   warning: Shades.orange,
   info: Shades.teal,
   success: Shades.green,
 };
 
-const ThemeShadeVariants = {
+export const ThemeColors = {
   primary: shadeVariants(ThemeShades.primary),
-  secondary: shadeVariants(ThemeShades.secondary),
+  neutral: shadeVariants(ThemeShades.neutral),
   error: shadeVariants(ThemeShades.error),
   warning: shadeVariants(ThemeShades.warning),
   info: shadeVariants(ThemeShades.info),
   success: shadeVariants(ThemeShades.success),
-};
-
-export const ThemeColors = {
-  ...ThemeShadeVariants,
 
   text: ThemeShades.primary.x300,
-  bodyBg: ThemeShades.secondary.x900,
+  bodyBg: ThemeShades.neutral.x900,
   heading: ThemeShades.primary.x10,
   muted: ThemeShades.primary.x400,
   link: ThemeShades.primary.x500,
-  border: ThemeShades.secondary.x800,
-  divider: ThemeShades.secondary.x700,
-  outline: ThemeShades.secondary.x600,
+  border: ThemeShades.neutral.x800,
+  divider: ThemeShades.neutral.x700,
+  outline: ThemeShades.neutral.x600,
   button: {
     primary: {
       bg: ThemeShades.primary.x500,
@@ -46,18 +42,18 @@ export const ThemeColors = {
       },
     },
     secondary: {
-      bg: ThemeShades.secondary.x50,
-      main: ThemeShades.secondary.x800,
-      border: ThemeShades.secondary.x50,
+      bg: ThemeShades.neutral.x50,
+      main: ThemeShades.neutral.x800,
+      border: ThemeShades.neutral.x50,
       hover: {
-        bg: ThemeShades.secondary.x100,
-        main: ThemeShades.secondary.x800,
-        border: ThemeShades.secondary.x100,
+        bg: ThemeShades.neutral.x100,
+        main: ThemeShades.neutral.x800,
+        border: ThemeShades.neutral.x100,
       },
       disabled: {
-        bg: ThemeShades.secondary.x100,
-        main: ThemeShades.secondary.x50,
-        border: ThemeShades.secondary.x100,
+        bg: ThemeShades.neutral.x100,
+        main: ThemeShades.neutral.x50,
+        border: ThemeShades.neutral.x100,
       },
     },
   },

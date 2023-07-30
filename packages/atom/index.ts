@@ -362,7 +362,12 @@ export const atomInLocalStorage = <TAtom extends Atom<UnsafeAny>>({
 
   if (storage) {
     const store = () => {
-      storage!.setItem(key, serializer!.stringify(atm.get()));
+      const value = atm.get();
+      if (value === undefined || (typeof value === "number" && isNaN(value))) {
+        storage!.removeItem(key);
+      } else {
+        storage!.setItem(key, serializer!.stringify(value));
+      }
     };
 
     atm.sub(() => {

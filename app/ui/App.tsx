@@ -1,26 +1,33 @@
 import { css, Global } from "@emotion/react";
-import "./App.css";
-
 import type { FC } from "react";
+
+import { themeCssVars } from "../theme/css";
 import { LeftToolbar } from "./LeftToolbar";
-import { ThemeColors } from "../theme/colors";
 
 const AppMainStyle = css`
-  background-color: ${ThemeColors.secondary.dark};
+  background-color: #666;
+  flex-grow: 1;
+`;
+
+const appGlobalCss = css`
+  :root {
+    ${themeCssVars}
+  }
+
+  .app-root {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    width: 100vw;
+  }
 `;
 
 export const App: FC = () => {
   return (
-    <Global
-      styles={{
-        ".some-class": {
-          fontSize: 50,
-          textAlign: "center",
-        },
-      }}
-    >
+    <>
+      <Global styles={appGlobalCss} />
       <LeftToolbar />
       <div css={AppMainStyle}>APP MAIN</div>
-    </Global>
+    </>
   );
 };

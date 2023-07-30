@@ -12,7 +12,6 @@
     "@gravitas/atom"
   ],
   "peerDependencies": {
-    "@emotion/css": "^11.11.2",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@gravitas/atom": "^0.0.0",

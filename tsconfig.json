@@ -3,6 +3,11 @@
   "compilerOptions": {
     "alwaysStrict": false,
     "jsx": "react-jsx",
-    "jsxImportSource": "@emotion/react"
+    "jsxImportSource": "@emotion/react",
+    "plugins": [
+      {
+        "name": "@styled/typescript-styled-plugin"
+      }
+    ]
   }
 }

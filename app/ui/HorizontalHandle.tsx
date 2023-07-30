@@ -1,5 +1,8 @@
+import { css } from "@emotion/react";
 import type { FC } from "react";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { Shades } from "../theme/shades";
 
 export interface HorizontalHandleProps {
   get: () => number;
@@ -15,7 +18,7 @@ export interface UseHorizontalHandle {
 }
 
 export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontalHandle => {
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isDraggingState, setIsDraggingState] = useState<boolean>(false);
 
   interface RefState {
     props: HorizontalHandleProps;
@@ -37,24 +40,31 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
 
   if (!state) {
     state = {
+      props,
       registered: 0,
 
       update(x: number) {
-        x = state.v + x - state.x;
-        const { min = 0, max = 8000 } = state.props;
+        const { min = 10, max = 8000 } = state.props;
+        x = Math.round(x) || 0;
+        if (state.start.dragging) {
+          x = state.v + x - state.x;
+        }
         state.props.set(x < min ? min : x > max ? max : Math.round(x));
       },
 
       handleMouseMove(e: MouseEvent) {
-        e.preventDefault();
-        state.update(e.clientX);
+        if (state.start.dragging) {
+          state.update(e.clientX);
+        }
       },
 
       handleTouchMove(e: TouchEvent) {
-        e.preventDefault();
-        const touch = e.touches[0];
-        if (touch) {
-          state.props.set(touch.clientX);
+        if (state.start.dragging) {
+          e.preventDefault();
+          const touch = e.touches[0];
+          if (touch) {
+            state.props.set(touch.clientX);
+          }
         }
       },
 
@@ -63,13 +73,19 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
       },
 
       handleKeyDown(e: KeyboardEvent) {
-        if (e.key === "Escape" || e.key === "Tab") {
-          state.props.set(state.v);
-          state.handleEnd();
-        } else if (e.key === "Enter" || e.key === " ") {
-          state.handleEnd();
-        } else if ((e.key === "r" || e.key === "R") && state.props.reset) {
-          state.props.reset();
+        if (state.start.dragging) {
+          if (e.key === "Escape" || e.key === "Tab") {
+            state.props.set(state.v);
+            state.handleEnd();
+            e.preventDefault();
+          } else if (e.key === "Enter" || e.key === " ") {
+            state.handleEnd();
+            e.preventDefault();
+          } else if ((e.key === "r" || e.key === "R") && state.props.reset) {
+            state.props.reset();
+            state.handleEnd();
+            e.preventDefault();
+          }
         }
       },
     } as RefState;
@@ -94,16 +110,18 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
     state.start = handleStart;
 
     ref.current = state;
+
+    state.update(props.get());
   }
 
   state.props = props;
-  state.setIsDragging = setIsDragging;
-  state.start.dragging = isDragging;
+  state.setIsDragging = setIsDraggingState;
+  state.start.dragging = isDraggingState;
 
   useEffect(() => {
     const { current } = ref;
 
-    if (!current || current.registered > 0 || !isDragging) {
+    if (!current || current.registered > 0 || !isDraggingState) {
       return undefined;
     }
 
@@ -129,17 +147,91 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
       window.removeEventListener("blur", current.handleEnd);
       window.removeEventListener("keydown", current.handleKeyDown);
     };
-  }, [isDragging]);
+  }, [isDraggingState]);
 
   return state.start;
 };
+
+export const HorizontalHandleCss = css`
+  flex-shrink: 0;
+  width: 6px;
+  position: relative;
+  cursor: col-resize;
+
+  > div {
+    height: 100%;
+    left: 0;
+    position: absolute;
+    width: 6px;
+    border: 1px solid ${Shades.neutral.x999};
+    background-color: ${Shades.neutral.x800};
+    transition: background-color 0.2s ease-in-out;
+
+    &::before {
+      content: "";
+      display: block;
+      height: 100%;
+      left: 50%;
+      position: relative;
+      margin-left: -1px;
+      border-left: 2px dashed ${Shades.neutral.x600};
+      transition: border-color 0.15s ease-in-out;
+    }
+
+    &:hover::before {
+      border-color: ${Shades.neutral.x600};
+    }
+
+    &:hover {
+      background-color: ${Shades.neutral.x700};
+    }
+  }
+
+  &::before {
+    content: "";
+    display: block;
+    position: absolute;
+    margin-left: -1px;
+    width: 8px;
+    height: 100%;
+    transition:
+      width 0.3s ease-in-out,
+      margin-left 0.3s ease-in-out,
+      border-color 0.2s ease-in-out,
+      background-color 0.2s ease-in-out;
+    background-color: rgb(0 0 0 0%);
+    border: 2px dashed rgb(0 0 0 / 0%);
+  }
+
+  &.dragging {
+    &::before {
+      margin-left: -17px;
+      width: 40px;
+      background-color: rgb(0 0 25 / 8%);
+      border-color: rgb(0 50 150 / 10%);
+    }
+
+    > div {
+      background-color: ${Shades.neutral.x600};
+
+      &::before {
+        border-color: ${Shades.indigo.x600};
+      }
+    }
+  }
+`;
 
 /** This is an handle, when dragged with the mouse or touching it changes size */
 export const HorizontalHandle: FC<HorizontalHandleProps> = (props) => {
   const handleStart = useHorizontalHandle(props);
   return (
-    <div className="left-toolbar__handle" onMouseDown={handleStart} onTouchStart={handleStart}>
-      <div className="left-toolbar__handle__inner" />
+    <div
+      css={HorizontalHandleCss}
+      className={handleStart.dragging ? "dragging" : ""}
+      onMouseDown={handleStart}
+      onTouchStart={handleStart}
+    >
+      <div />
     </div>
   );
 };

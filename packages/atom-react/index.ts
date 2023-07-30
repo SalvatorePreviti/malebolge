@@ -1,5 +1,5 @@
-import { useRef, useSyncExternalStore } from "react";
 import type { ConsumerProps, FC, ReactNode } from "react";
+import { useRef, useSyncExternalStore } from "react";
 
 export interface ReactAtom<T> {
   readonly get: () => T;
