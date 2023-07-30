@@ -24,13 +24,11 @@ export interface ReadonlyAtomValue<T> {
 
 /** The type of an object that can be subscribed to and has a value */
 export interface ReadonlyAtom<T> extends AtomSubscribeable, ReadonlyAtomValue<T> {
-  readonly initialized: boolean;
-
   /** An unique version number, that changes every time the value of this atom changes */
   readonly v: number;
 
   /** True if the atom was disposed */
-  readonly disposed?: boolean;
+  readonly isDisposed?: boolean;
 
   readonly get: AtomGetterFn<T>;
 
@@ -40,7 +38,7 @@ export interface ReadonlyAtom<T> extends AtomSubscribeable, ReadonlyAtomValue<T>
 
 export interface Atom<T> extends ReadonlyAtom<T> {
   /** True if the atom was disposed */
-  readonly disposed: boolean;
+  readonly isDisposed: boolean;
 
   /** The current value of the atom */
   get value(): T;
@@ -54,13 +52,46 @@ export interface Atom<T> extends ReadonlyAtom<T> {
   readonly reset: () => boolean;
 
   readonly dispose: () => boolean;
+
+  /** The serializer/deserializer associated to this atom. By default is JSON */
+  serializer: AtomSerializer<T>;
 }
 
-const _notInitialized = {};
-let _v = 0;
+export type AtomDependenciesOptions =
+  | readonly (AtomSubscribeFn | AtomSubscribeable | null | undefined | false | 0 | "")[]
+  | null
+  | undefined
+  | false;
 
+export type AtomInitializer<TAtom> = (atom: TAtom) => AtomDisposer<TAtom> | void | null | undefined;
+
+export type AtomDisposer<TAtom> = (atom: TAtom) => void;
+
+export interface AtomOptions<T = UnsafeAny, TAtom = Atom<T>> {
+  /**
+   * If passed and not empty, the atom will call the atom.set(compute()) function every time one of the dependencies changes.
+   * Used to created derived atoms.
+   */
+  dependencies?: AtomDependenciesOptions;
+
+  /**
+   * Function called upon initialization, the first time the value of the atom is read.
+   * Can optionally return a destructor function that is invoked on dispose()
+   */
+  init?: AtomInitializer<TAtom> | null | undefined;
+
+  /** Called before setting a value */
+  adjust?: ((value: T, atom: TAtom) => T) | null | undefined | false;
+
+  /** The serializer/deserializer associated to this atom. By default is JSON */
+  serializer?: AtomSerializer<T> | undefined;
+}
+
+let _v = 0;
 let _atomInLocalStoragePending: Set<() => void> | undefined;
 let _atomInLocalStorageThrottle: ReturnType<typeof setTimeout> | undefined | null;
+const _noAdjust = <T>(value: T) => value;
+const _notInitialized = Symbol("_");
 
 const _flushAtomLocalStorage = () => {
   if (_atomInLocalStorageThrottle) {
@@ -109,15 +140,14 @@ export type ValueOfAtom<TAtom extends ReadonlyAtomValue<UnsafeAny>> = TAtom exte
  * myAtom0.reset();
  *
  */
-export const atom = <T>(
-  compute: (atom: Atom<T>) => T,
-  dependencies?:
-    | readonly (AtomSubscribeFn | AtomSubscribeable | null | undefined | false | 0 | "")[]
-    | null
-    | undefined,
-): Atom<T> => {
+export const atom = <T>(compute: (atom: Atom<T>) => T, options?: Readonly<AtomOptions<T>>): Atom<T> => {
   let state: T | typeof _notInitialized = _notInitialized;
   let self: Atom<T>;
+
+  let init: AtomInitializer<Atom<T>> | null | undefined;
+  let initDisposer: AtomDisposer<Atom<T>> | null | undefined;
+  let adjust: (value: T, atom: Atom<T>) => T = _noAdjust;
+  let unsubscribes: AtomUnsubsribeFn[] | undefined;
 
   // This implementation uses a doubly linked list for performance and memory efficiency
   // sub and unsub are O(1) and performs better than using an array from the benchmarks.
@@ -132,8 +162,53 @@ export const atom = <T>(
   let head: PubSubNode | null | undefined;
   let tail: PubSubNode | null | undefined;
 
+  let dispose: (() => boolean) | null = (): boolean => {
+    if (!dispose) {
+      return false;
+    }
+
+    dispose = null;
+    (self as { isDisposed: boolean }).isDisposed = true;
+
+    try {
+      // Remove all subscriptions
+      if (head) {
+        let node: PubSubNode | null | undefined = head;
+        if (node) {
+          head = null;
+          tail = null;
+          do {
+            const next: PubSubNode | null | undefined = node.n;
+            node.f = null;
+            node.p = null;
+            node.n = null;
+            node = next;
+          } while (node);
+        }
+      }
+
+      // Remove from all dependencies
+      if (unsubscribes) {
+        const array = unsubscribes;
+        unsubscribes = undefined;
+        for (let i = 0; i < array.length; ++i) {
+          array[i]!();
+        }
+      }
+    } finally {
+      _flushAtomLocalStorage();
+      const _disposer = initDisposer;
+      if (_disposer) {
+        initDisposer = null;
+        _disposer(self);
+      }
+    }
+
+    return true;
+  };
+
   const sub: AtomSubscribeFn = (listener: AtomListenerFn | null | undefined | false): AtomUnsubsribeFn => {
-    if (!listener || self.disposed) {
+    if (!listener || !dispose) {
       return () => false;
     }
 
@@ -180,12 +255,26 @@ export const atom = <T>(
     return unsub;
   };
 
+  let doInit: (() => void) | null = () => {
+    doInit = null;
+    const _init = init;
+    if (_init) {
+      init = null;
+      initDisposer = _init(self) || null;
+    }
+  };
+
   const set = (value: T): boolean => {
+    value = adjust(value, self);
     if (state === value) {
       return false;
     }
     state = value;
     (self as { v: number }).v = ++_v;
+
+    if (doInit) {
+      doInit();
+    }
 
     // Loop through the linked list and call all listeners
     let node = head;
@@ -205,72 +294,54 @@ export const atom = <T>(
 
   const get = (): T => {
     if (state === _notInitialized) {
+      if (doInit) {
+        doInit();
+      }
       state = compute(self);
-      (self as { initialized: boolean }).initialized = true;
     }
-    return state as T;
+    return state;
   };
 
   const reset = () => self.set(compute(self));
 
-  let unsubscribes: AtomUnsubsribeFn[] | undefined;
-
-  const dispose = (): boolean => {
-    if (self.disposed) {
-      return false;
-    }
-
-    (self as { disposed: boolean }).disposed = true;
-
-    try {
-      // Remove all subscriptions
-      if (head) {
-        let node: PubSubNode | null | undefined = head;
-        if (node) {
-          head = null;
-          tail = null;
-          do {
-            const next: PubSubNode | null | undefined = node.n;
-            node.f = null;
-            node.p = null;
-            node.n = null;
-            node = next;
-          } while (node);
-        }
-      }
-
-      // Remove from all dependencies
-      if (unsubscribes) {
-        const array = unsubscribes;
-        unsubscribes = undefined;
-        for (let i = 0; i < array.length; ++i) {
-          array[i]!();
-        }
-      }
-    } finally {
-      _flushAtomLocalStorage();
-      reset();
-    }
-
-    return true;
-  };
-
-  self = { disposed: false, v: ++_v, initialized: false, sub, get, set, reset, dispose } satisfies Omit<
-    Atom<T>,
-    "value"
-  > as Atom<T>;
+  self = {
+    isDisposed: false,
+    v: ++_v,
+    sub,
+    get,
+    set,
+    reset,
+    dispose,
+    serializer: JSON as AtomSerializer<T>,
+  } satisfies Omit<Atom<T>, "value"> as Atom<T>;
 
   Reflect.defineProperty(self, "value", { get, set });
 
-  if (dependencies) {
-    for (const dep of dependencies) {
-      if (dep) {
-        if (!unsubscribes) {
-          unsubscribes = [];
+  if (options) {
+    const { dependencies, serializer, init: _init, adjust: _adjust } = options;
+
+    if (_init) {
+      init = _init;
+    }
+
+    if (_adjust) {
+      adjust = _adjust;
+    }
+
+    if (serializer) {
+      self.serializer = serializer;
+    }
+
+    if (dependencies) {
+      for (const dep of dependencies) {
+        if (dep) {
+          if (!unsubscribes) {
+            unsubscribes = [];
+          }
+          unsubscribes.push(
+            (dep as AtomSubscribeable).sub ? (dep as AtomSubscribeable).sub(reset) : (dep as AtomSubscribeFn)(reset),
+          );
         }
-        unsubscribes.push(
-          (dep as AtomSubscribeable).sub ? (dep as AtomSubscribeable).sub(reset) : (dep as AtomSubscribeFn)(reset),
-        );
       }
     }
   }
@@ -317,17 +388,11 @@ export const atomInLocalStorage = <TAtom extends Atom<UnsafeAny>>({
   key,
   atom: atm,
   storage,
-  serializer,
 }: {
   key: string;
   atom: TAtom;
   storage?: AtomGenericStorage | null | undefined;
-  serializer?: AtomSerializer<ValueOfAtom<TAtom>> | undefined;
 }): TAtom & { remove(): void; reload(): boolean } => {
-  if (!serializer) {
-    serializer = JSON;
-  }
-
   if (storage === undefined) {
     storage = typeof localStorage !== "undefined" ? localStorage : null;
   }
@@ -348,7 +413,7 @@ export const atomInLocalStorage = <TAtom extends Atom<UnsafeAny>>({
     const result = false;
     const value = storage.getItem(key);
     if (value) {
-      atm.set(serializer!.parse(value));
+      atm.set(atm.serializer.parse(value));
     }
     return result;
   };
@@ -366,7 +431,7 @@ export const atomInLocalStorage = <TAtom extends Atom<UnsafeAny>>({
       if (value === undefined || (typeof value === "number" && isNaN(value))) {
         storage!.removeItem(key);
       } else {
-        storage!.setItem(key, serializer!.stringify(value));
+        storage!.setItem(key, atm.serializer.stringify(value));
       }
     };
 
