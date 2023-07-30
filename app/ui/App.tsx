@@ -2,7 +2,6 @@ import { css, Global } from "@emotion/react";
 import type { FC } from "react";
 
 import { themeCssVars } from "../theme/css";
-import { Shades } from "../theme/shades";
 import { AppMain } from "./AppMain";
 import { LeftToolbar } from "./LeftToolbar";
 

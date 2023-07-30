@@ -22,15 +22,14 @@ const LeftToolbarBodyCss = css`
 `;
 
 const LeftToolbarHeader = css`
-  height: 20px;
-  background-color: ${Shades.neutral.x700};
+  height: 22px;
+  background-color: ${Shades.neutral.x800};
   text-align: center;
-  padding-left: 28px;
-  padding-right: 28px;
   user-select: none;
 
   > img {
     left: 3px;
+    top: 1px;
     position: absolute;
     margin: 3px 5px;
     pointer-events: none;
@@ -38,9 +37,13 @@ const LeftToolbarHeader = css`
 
   > b {
     display: block;
-    color: ${Shades.blue.x100};
+    flex-grow: 1;
+    color: ${Shades.neutral.x400};
     white-space: nowrap;
     transition: color 0.2s ease-in-out;
+    font-family: var(--font-mono);
+    padding-left: 28px;
+    padding-right: 28px;
 
     &:hover {
       color: ${Shades.blue.x50};

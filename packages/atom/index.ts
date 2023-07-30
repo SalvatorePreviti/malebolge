@@ -297,7 +297,7 @@ export const atom = <T>(compute: (atom: Atom<T>) => T, options?: Readonly<AtomOp
       if (doInit) {
         doInit();
       }
-      state = compute(self);
+      state = adjust(compute(self), self);
     }
     return state;
   };

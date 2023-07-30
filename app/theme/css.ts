@@ -1,3 +1,9 @@
+import "@fontsource/inter/latin-100.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/jetbrains-mono/latin-100.css";
+import "@fontsource/jetbrains-mono/latin-700.css";
+import "./main.css";
+
 import type { CSSObject } from "@emotion/styled";
 
 import { ThemeColors } from "./colors";

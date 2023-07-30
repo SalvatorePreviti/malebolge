@@ -1,6 +1,4 @@
-import "./main.css";
-import "@fontsource/inter/latin.css";
-import "@fontsource/jetbrains-mono/latin.css";
+import "./theme/css";
 
 import { createRoot } from "react-dom/client";
 
