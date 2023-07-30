@@ -4,6 +4,7 @@ import type { FC } from "react";
 import { themeCssVars } from "../theme/css";
 import { AppMain } from "./AppMain";
 import { LeftToolbar } from "./LeftToolbar";
+import { MainToolbar } from "./MainToolbar";
 
 const appGlobalCss = css`
   :root {
@@ -18,12 +19,22 @@ const appGlobalCss = css`
   }
 `;
 
+const appMainCss = css`
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+`;
+
 export const App: FC = () => {
   return (
     <>
       <Global styles={appGlobalCss} />
       <LeftToolbar />
-      <AppMain />
+      <div css={appMainCss}>
+        <AppMain />
+        <MainToolbar />
+      </div>
     </>
   );
 };

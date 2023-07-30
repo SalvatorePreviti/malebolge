@@ -5,7 +5,7 @@ import type { FC } from "react";
 import { atom_leftToolbarWidth } from "../state/ui-atoms";
 import { Shades } from "../theme/shades";
 import { FpsGraph } from "./FpsGraph";
-import { HorizontalHandle } from "./HorizontalHandle";
+import { HVHandle } from "./HVHandle";
 
 const LeftToolbarCss = css`
   display: flex;
@@ -14,7 +14,7 @@ const LeftToolbarCss = css`
 `;
 
 const LeftToolbarBodyCss = css`
-  background-color: ${Shades.neutral.x800};
+  background-color: ${Shades.neutral.x900};
   flex-grow: 1;
   display: flex;
   flex-direction: column;
@@ -56,7 +56,6 @@ export const LeftToolbar: FC = () => {
 
   return (
     <div
-      className="left-toolbar"
       css={LeftToolbarCss}
       style={{
         width: leftToolbarWidth,
@@ -69,11 +68,7 @@ export const LeftToolbar: FC = () => {
         </div>
         <FpsGraph />
       </div>
-      <HorizontalHandle
-        get={atom_leftToolbarWidth.get}
-        set={atom_leftToolbarWidth.set}
-        reset={atom_leftToolbarWidth.reset}
-      />
+      <HVHandle get={atom_leftToolbarWidth.get} set={atom_leftToolbarWidth.set} reset={atom_leftToolbarWidth.reset} />
     </div>
   );
 };

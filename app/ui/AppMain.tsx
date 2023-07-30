@@ -8,11 +8,10 @@ const MAX_CANVAS_WIDTH = 800;
 const MAX_CANVAS_HEIGHT = 800;
 
 const AppMainStyle = css`
-  background-color: ${Shades.neutral.x900};
-  flex-grow: 1;
   display: flex;
   justify-content: center;
   align-items: center;
+  flex-grow: 1;
 
   > canvas {
     background: #000;

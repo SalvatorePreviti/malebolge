@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { Shades } from "../theme/shades";
 
-export interface HorizontalHandleProps {
+export interface HVHandleProps {
+  type?: "H" | "V";
+  dir?: 1 | -1;
   get: () => number;
   set: (value: number) => void;
   reset?: (() => void) | null | undefined | false;
@@ -12,26 +14,25 @@ export interface HorizontalHandleProps {
   max?: number;
 }
 
-export interface UseHorizontalHandle {
+export interface HVHandle {
   (e: React.MouseEvent | React.TouchEvent): void;
   dragging: boolean;
 }
 
-export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontalHandle => {
+export const useHVHandle = (inputProps: HVHandleProps): HVHandle => {
   const [isDraggingState, setIsDraggingState] = useState<boolean>(false);
 
   interface RefState {
-    props: HorizontalHandleProps;
-    start: UseHorizontalHandle;
-    handleMouseMove(e: MouseEvent): void;
-    handleTouchMove(e: TouchEvent): void;
+    props: HVHandleProps;
+    start: HVHandle;
+    handleMove(e: TouchEvent | MouseEvent): void;
     handleEnd(): void;
     handleKeyDown(e: KeyboardEvent): void;
     update(x: number): void;
     registered: number;
     setIsDragging: (value: boolean) => void;
     v: number;
-    x: number;
+    p: number;
   }
 
   const ref = useRef<RefState>(null as unknown as RefState);
@@ -40,30 +41,28 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
 
   if (!state) {
     state = {
-      props,
+      props: inputProps,
       registered: 0,
 
-      update(x: number) {
+      update(p: number) {
         const { min = 10, max = 8000 } = state.props;
-        x = Math.round(x) || 0;
+        p = Math.round(p) || 0;
         if (state.start.dragging) {
-          x = state.v + x - state.x;
+          p = state.v + (p - state.p) * (state.props.dir || 1);
         }
-        state.props.set(x < min ? min : x > max ? max : Math.round(x));
+        state.props.set(p < min ? min : p > max ? max : Math.round(p));
       },
 
-      handleMouseMove(e: MouseEvent) {
+      handleMove(e: MouseEvent | TouchEvent) {
         if (state.start.dragging) {
-          state.update(e.clientX);
-        }
-      },
-
-      handleTouchMove(e: TouchEvent) {
-        if (state.start.dragging) {
-          e.preventDefault();
-          const touch = e.touches[0];
-          if (touch) {
-            state.props.set(touch.clientX);
+          if (e.type === "touchmove") {
+            e.preventDefault();
+            const touch = (e as TouchEvent).touches?.[0];
+            if (touch) {
+              state.update(state.props.type === "V" ? touch.clientY : touch.clientX);
+            }
+          } else {
+            state.update(state.props.type === "V" ? (e as MouseEvent).clientY : (e as MouseEvent).clientX);
           }
         }
       },
@@ -97,9 +96,9 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
         if (!touch) {
           return;
         }
-        state.x = touch.clientX;
+        state.p = state.props.type === "V" ? touch.clientY : touch.clientX;
       } else {
-        state.x = (e as React.MouseEvent).clientX;
+        state.p = state.props.type === "V" ? (e as React.MouseEvent).clientY : (e as React.MouseEvent).clientX;
       }
       state.v = state.props.get();
       state.setIsDragging(true);
@@ -111,10 +110,10 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
 
     ref.current = state;
 
-    state.update(props.get());
+    state.update(state.props.get());
   }
 
-  state.props = props;
+  state.props = inputProps;
   state.setIsDragging = setIsDraggingState;
   state.start.dragging = isDraggingState;
 
@@ -127,8 +126,8 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
 
     ++current.registered;
 
-    window.addEventListener("mousemove", current.handleMouseMove);
-    window.addEventListener("touchmove", current.handleTouchMove);
+    window.addEventListener("mousemove", current.handleMove);
+    window.addEventListener("touchmove", current.handleMove);
     window.addEventListener("mouseup", current.handleEnd);
     window.addEventListener("touchend", current.handleEnd);
     window.addEventListener("touchcancel", current.handleEnd);
@@ -138,8 +137,8 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
 
     return () => {
       --current.registered;
-      window.removeEventListener("mousemove", current.handleMouseMove);
-      window.removeEventListener("touchmove", current.handleTouchMove);
+      window.removeEventListener("mousemove", current.handleMove);
+      window.removeEventListener("touchmove", current.handleMove);
       window.removeEventListener("mouseup", current.handleEnd);
       window.removeEventListener("touchend", current.handleEnd);
       window.removeEventListener("touchcancel", current.handleEnd);
@@ -152,15 +151,11 @@ export const useHorizontalHandle = (props: HorizontalHandleProps): UseHorizontal
   return state.start;
 };
 
-export const HorizontalHandleCss = css`
+export const HVHandleCss = css`
   position: relative;
-  cursor: col-resize;
 
   > div {
-    height: 100%;
-    left: 0;
     position: absolute;
-    width: 6px;
     border: 1px solid ${Shades.neutral.x999};
     background-color: ${Shades.neutral.x800};
     transition: background-color 0.2s ease-in-out;
@@ -168,11 +163,7 @@ export const HorizontalHandleCss = css`
     &::before {
       content: "";
       display: block;
-      height: 100%;
-      left: 50%;
       position: relative;
-      margin-left: -1px;
-      border-left: 2px dashed ${Shades.neutral.x600};
       transition: border-color 0.15s ease-in-out;
     }
 
@@ -189,22 +180,12 @@ export const HorizontalHandleCss = css`
     content: "";
     display: block;
     position: absolute;
-    margin-left: -1px;
-    width: 8px;
-    height: 100%;
-    transition:
-      width 0.3s ease-in-out,
-      margin-left 0.3s ease-in-out,
-      border-color 0.2s ease-in-out,
-      background-color 0.2s ease-in-out;
     background-color: rgb(0 0 0 0%);
-    border: 2px dashed rgb(0 0 0 / 0%);
+    border: 2px solid rgb(0 0 0 / 0%);
   }
 
   &.dragging {
     &::before {
-      margin-left: -17px;
-      width: 40px;
       background-color: rgb(0 0 25 / 8%);
       border-color: rgb(0 50 150 / 10%);
     }
@@ -219,12 +200,90 @@ export const HorizontalHandleCss = css`
   }
 `;
 
+export const HorizontalHandleCss = css`
+  ${HVHandleCss}
+
+  cursor: col-resize;
+
+  > div {
+    border-top: none;
+    border-bottom: none;
+    height: 100%;
+    left: 0;
+    width: 6px;
+
+    &::before {
+      height: 100%;
+      left: 50%;
+      margin-left: -1px;
+      border-left: 2px solid ${Shades.neutral.x600};
+    }
+  }
+
+  &::before {
+    margin-left: -1px;
+    width: 8px;
+    height: 100%;
+    transition:
+      width 0.3s ease-in-out,
+      margin-left 0.3s ease-in-out,
+      border-color 0.2s ease-in-out,
+      background-color 0.2s ease-in-out;
+  }
+
+  &.dragging {
+    &::before {
+      margin-left: -17px;
+      width: 40px;
+    }
+  }
+`;
+
+export const VerticalHandleCss = css`
+  ${HVHandleCss}
+
+  cursor: row-resize;
+
+  > div {
+    border-left: none;
+    border-right: none;
+    width: 100%;
+    top: 0;
+    height: 6px;
+
+    &::before {
+      width: 100%;
+      top: 50%;
+      margin-top: -1px;
+      border-top: 2px solid ${Shades.neutral.x600};
+    }
+  }
+
+  &::before {
+    margin-top: -1px;
+    height: 8px;
+    width: 100%;
+    transition:
+      height 0.3s ease-in-out,
+      margin-top 0.3s ease-in-out,
+      border-color 0.2s ease-in-out,
+      background-color 0.2s ease-in-out;
+  }
+
+  &.dragging {
+    &::before {
+      margin-top: -17px;
+      height: 40px;
+    }
+  }
+`;
+
 /** This is an handle, when dragged with the mouse or touching it changes size */
-export const HorizontalHandle: FC<HorizontalHandleProps> = (props) => {
-  const handleStart = useHorizontalHandle(props);
+export const HVHandle: FC<HVHandleProps> = (props) => {
+  const handleStart = useHVHandle(props);
   return (
     <div
-      css={HorizontalHandleCss}
+      css={props.type === "V" ? VerticalHandleCss : HorizontalHandleCss}
       className={handleStart.dragging ? "dragging" : ""}
       onMouseDown={handleStart}
       onTouchStart={handleStart}
