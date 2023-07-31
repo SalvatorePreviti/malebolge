@@ -4,6 +4,7 @@
     "alwaysStrict": false,
     "jsx": "react-jsx",
     "jsxImportSource": "@emotion/react",
+    "types": ["@webgpu/types"],
     "plugins": [
       {
         "name": "@styled/typescript-styled-plugin"

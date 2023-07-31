@@ -2,6 +2,7 @@ import { css } from "@emotion/react";
 import type { FC } from "react";
 import { useEffect, useRef } from "react";
 
+import { WgslManager } from "../renderer";
 import { Shades } from "../theme/shades";
 
 const MAX_CANVAS_WIDTH = 800;
@@ -24,7 +25,13 @@ export const AppMain: FC = () => {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) {
+      return undefined;
+    }
+
     const container = canvas?.parentElement;
+
+    const wgslManager = new WgslManager(canvas);
 
     const updateCanvasSize = () => {
       if (canvas && container) {
@@ -47,7 +54,20 @@ export const AppMain: FC = () => {
     if (container) {
       resizeObserver.observe(container);
       resizeObserver.observe(canvas);
+      wgslManager.destroy();
     }
+
+    updateCanvasSize();
+
+    wgslManager
+      .init()
+      .then(async () => {
+        const info = await wgslManager.adapter?.requestAdapterInfo();
+        console.log("WGPU initialized", info);
+      })
+      .catch((error) => {
+        console.error(error);
+      });
 
     return () => {
       resizeObserver.disconnect();
