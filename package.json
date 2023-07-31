@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest",
-    "precommit": "lint-staged"
+    "precommit": "lint-staged",
+    "lint": "eslint --no-error-on-unmatched-pattern --fix . && prettier --write ."
   },
   "repository": {
     "type": "git",
