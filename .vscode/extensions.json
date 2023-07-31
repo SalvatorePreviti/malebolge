@@ -9,6 +9,7 @@
     "mgmcdermott.vscode-language-babel",
     "stylelint.vscode-stylelint",
     "kamikillerto.vscode-colorize",
-    "styled-components.vscode-styled-components"
+    "styled-components.vscode-styled-components",
+    "noah-labrecque.wgsl-lang"
   ]
 }
