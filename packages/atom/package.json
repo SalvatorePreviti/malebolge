@@ -1,0 +1,23 @@
+{
+  "name": "@malebolge/atom",
+  "version": "0.0.0",
+  "description": "Atomic state pubsub",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SalvatorePreviti/malebolge.git",
+    "directory": "packages/atom"
+  },
+  "keywords": [
+    "malebolge",
+    "engine",
+    "atom"
+  ],
+  "author": "Salvatore Previti",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SalvatorePreviti/malebolge/issues"
+  },
+  "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/atom/#readme",
+  "private": true
+}
