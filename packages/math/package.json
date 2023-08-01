@@ -1,0 +1,23 @@
+{
+  "name": "@malebolge/math",
+  "version": "0.0.0",
+  "description": "Math",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SalvatorePreviti/malebolge.git",
+    "directory": "packages/math"
+  },
+  "keywords": [
+    "malebolge",
+    "engine",
+    "atom"
+  ],
+  "author": "Salvatore Previti",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SalvatorePreviti/malebolge/issues"
+  },
+  "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/math/#readme",
+  "private": true
+}

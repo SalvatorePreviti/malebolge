@@ -1,5 +1,3 @@
 {
-  "extends": [
-    "@balsamic"
-  ]
+  "extends": ["@balsamic"]
 }
