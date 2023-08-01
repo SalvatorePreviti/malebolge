@@ -1,14 +1,3 @@
 {
-  "extends": "@balsamic/tsn/tsconfig.json",
-  "compilerOptions": {
-    "alwaysStrict": false,
-    "jsx": "react-jsx",
-    "jsxImportSource": "@emotion/react",
-    "types": ["@webgpu/types"],
-    "plugins": [
-      {
-        "name": "@styled/typescript-styled-plugin"
-      }
-    ]
-  }
+  "extends": "@balsamic/eslint-config/tsconfig.json"
 }

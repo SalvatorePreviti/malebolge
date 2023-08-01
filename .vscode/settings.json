@@ -72,33 +72,5 @@
   "prettier.singleQuote": false,
   "prettier.tabWidth": 2,
   "prettier.trailingComma": "all",
-  "prettier.useTabs": false,
-  "editor.bracketPairColorization.enabled": true,
-  "editor.guides.bracketPairs": "active",
-  "files.exclude": {
-    "**/.git": true,
-    "**/.svn": true,
-    "**/.hg": true,
-    "**/CVS": true,
-    "**/.DS_Store": true,
-    "**/Thumbs.db": true,
-    ".history/": true,
-    "**/infrastructure/qbs-provider/vendor": true,
-    "**/infrastructure/**/*/bin": true
-  },
-
-  // This setting is very cool, it runs typecheck in all files in VSCode.
-  // However, it slows down the editor so I leave it disabled by default. Enable when you need it during development.
-  //"typescript.tsserver.experimental.enableProjectDiagnostics": true
-
-  "jest.autoRun": "off",
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "[svg]": {
-    "editor.defaultFormatter": "jock.svg"
-  },
-  "extensions.ignoreRecommendations": false,
-
-  "stylelint.configFile": "stylelint.config.cjs",
-  "stylelint.validate": ["typescriptreact", "css", "postcss", "less", "scss", "sass"],
-  "colorize.languages": ["typescript", "javascript", "css", "scss"]
+  "prettier.useTabs": false
 }

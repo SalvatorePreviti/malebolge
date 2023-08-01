@@ -1,9 +1,5 @@
 {
-  "extends": ["@balsamic"],
-  "plugins": ["simple-import-sort"],
-  "rules": {
-    "node/no-unpublished-require": 0,
-    "react/no-unknown-property": ["error", { "ignore": ["css"] }],
-    "simple-import-sort/imports": 1
-  }
+  "extends": [
+    "@balsamic"
+  ]
 }
