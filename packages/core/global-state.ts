@@ -127,7 +127,7 @@ export interface GlobalStateStore {
   setValue<T = unknown>(state: ReadonlyGlobalState<T>, value: T | UNSET): void;
 }
 
-const K: unique symbol = Symbol("K");
+const K: unique symbol = Symbol("inline-store");
 
 /** Indicates an unset value in a globnal state store */
 export const UNSET: unique symbol = Symbol("UNSET");
@@ -136,7 +136,7 @@ export const UNSET: unique symbol = Symbol("UNSET");
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export type UNSET = typeof UNSET;
 
-interface InlineStore<T> extends GlobalState<T> {
+interface InlineStore<T> extends ReadonlyGlobalState<T> {
   [K]: T | UNSET;
 }
 
@@ -148,12 +148,14 @@ interface InlineStore<T> extends GlobalState<T> {
  * @param initial The initial value of the state. If is a function, it will be called with the state as argument the first time the state is accessed.
  * @param dependencies An optional list of GlobalState instances that will force the initial function to be called again when they change.
  *
+ * This code is based on https://github.com/SalvatorePreviti/malebolge - MIT license
+ *
  * @returns A new GlobalState instance.
  */
 export const newGlobalState: {
   <T>(
     initial: (state: GlobalState<T>) => T,
-    dependencies?: readonly SimpleEventSubscribable<unknown>[] | null | undefined,
+    dependencies?: readonly SimpleEventSubscribable<unknown>[] | null | undefined | true,
   ): GlobalState<T>;
 
   <T>(initial: T): GlobalState<T>;
@@ -168,7 +170,7 @@ export const newGlobalState: {
   getStore(globalState: ReadonlyGlobalState<unknown>): GlobalStateStore;
 } = /* @__PURE__ */ <T>(
   initial: T extends Function ? (state: GlobalState<T>) => T : ((state: GlobalState<T>) => T) | T,
-  dependencies?: readonly SimpleEventSubscribable<unknown>[] | null | undefined,
+  dependencies?: readonly SimpleEventSubscribable<unknown>[] | null | undefined | true,
 ) => {
   const { sub, emit } = newSimpleEvent<GlobalState<T>>();
 
@@ -206,14 +208,11 @@ export const newGlobalState: {
     }
   };
 
-  instance = { [K]: UNSET, initial: true, get, set, reset, sub } satisfies Omit<
-    InlineStore<T>,
-    "value"
-  > as unknown as GlobalState<T>;
+  instance = { [K]: UNSET, initial: true, get, set, reset, sub } as unknown as GlobalState<T>;
 
   Reflect.defineProperty(instance, "value", { get, set });
 
-  if (dependencies) {
+  if (dependencies && dependencies !== true) {
     // Use a weak reference to avoid memory leaks
     const weakref = new WeakRef(instance);
     const update = () => {
@@ -229,6 +228,42 @@ export const newGlobalState: {
 };
 
 /**
+ * Creates a new ReadonlyGlobalState instance, that has only a getter.
+ * The getter will be called every time and an event will be emitted if the value changes during get()
+ *
+ * @param getter A function that will be called every time the value is accessed.
+ *
+ * @returns A new ReadonlyGlobalState instance.
+ */
+export const newReadonlyGlobalState = <T>(
+  getter: (globalState: ReadonlyGlobalState<T>) => T,
+): ReadonlyGlobalState<T> => {
+  let instance: ReadonlyGlobalState<T>;
+
+  const { sub, emit } = newSimpleEvent<ReadonlyGlobalState<T>>();
+
+  const get = (): T => {
+    const store = newGlobalState.getStore(instance);
+    const oldValue = store.getValue<T>(instance);
+    const value = getter(instance);
+
+    if (oldValue !== value) {
+      store.setValue<T>(instance, value);
+      if (oldValue !== UNSET) {
+        emit(instance);
+      }
+    }
+    return value;
+  };
+
+  instance = { [K]: UNSET, get, sub } as unknown as ReadonlyGlobalState<T>;
+
+  Reflect.defineProperty(instance, "value", { get });
+
+  return instance;
+};
+
+/**
  * The default global static store used in the frontend.
  *
  * A store that can be used to store global state.
@@ -238,11 +273,11 @@ export const newGlobalState: {
  * The store can be overridden by replacing the getStore function
  */
 export const globalStaticStore: GlobalStateStore = {
-  getValue<T>(state: GlobalState<T>) {
+  getValue<T>(state: ReadonlyGlobalState<T>) {
     return (state as InlineStore<T>)[K];
   },
 
-  setValue<T>(state: GlobalState<T>, value: T | UNSET): void {
+  setValue<T>(state: ReadonlyGlobalState<T>, value: T | UNSET): void {
     (state as InlineStore<T>)[K] = value;
   },
 };

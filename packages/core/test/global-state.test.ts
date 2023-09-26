@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ReadonlyGlobalState, GlobalStateStore } from "../global-state";
-import { newGlobalState, globalStaticStore, UNSET, LocalGlobalStateStore } from "../global-state";
+import {
+  newGlobalState,
+  globalStaticStore,
+  UNSET,
+  LocalGlobalStateStore,
+  newReadonlyGlobalState,
+} from "../global-state";
 
 describe("GlobalState", () => {
   it("should initialize with the initial value", () => {
@@ -136,6 +142,25 @@ describe("GlobalState", () => {
       expect(callCount).toBe(1);
       expect(globalState.initial).toBe(false);
     });
+  });
+});
+
+describe("ReadonlyGlobalState", () => {
+  it("should expose a get that when invoked returns the current value", () => {
+    let getterCount = 0;
+    let eventCallCount = 0;
+    const globalState = newReadonlyGlobalState(() => (getterCount < 3 ? ++getterCount : 3));
+    globalState.sub(() => {
+      ++eventCallCount;
+    });
+    expect(globalState.get()).toBe(1);
+    expect(eventCallCount).toBe(0);
+    expect(globalState.get()).toBe(2);
+    expect(eventCallCount).toBe(1);
+    expect(globalState.get()).toBe(3);
+    expect(eventCallCount).toBe(2);
+    expect(globalState.get()).toBe(3);
+    expect(eventCallCount).toBe(2);
   });
 });
 
