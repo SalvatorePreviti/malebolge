@@ -22,6 +22,9 @@ describe("SimpleEvent", () => {
 
   it("should handle multiple subscriptions", () => {
     const simpleEvent = newSimpleEvent<number>();
+
+    expect(simpleEvent.sub.subscribers).toBe(0);
+
     const values1: number[] = [];
     const values2: number[] = [];
 
@@ -29,9 +32,13 @@ describe("SimpleEvent", () => {
       values1.push(value);
     });
 
+    expect(simpleEvent.sub.subscribers).toBe(1);
+
     const unsub2 = simpleEvent.sub((value) => {
       values2.push(value);
     });
+
+    expect(simpleEvent.sub.subscribers).toBe(2);
 
     simpleEvent.emit(1);
 
@@ -39,7 +46,12 @@ describe("SimpleEvent", () => {
     expect(values2).toEqual([1]);
 
     unsub1(); // Unsubscribe the first handler
+
+    expect(simpleEvent.sub.subscribers).toBe(1);
+
     unsub1(); // this should be a no-op
+
+    expect(simpleEvent.sub.subscribers).toBe(1);
 
     simpleEvent.emit(2);
 
@@ -48,10 +60,17 @@ describe("SimpleEvent", () => {
 
     unsub2(); // Unsubscribe the second handler
 
+    expect(simpleEvent.sub.subscribers).toBe(0);
+
     simpleEvent.emit(3);
 
     expect(values1).toEqual([1]); // First handler should still not have been called
     expect(values2).toEqual([1, 2]); // Second handler should still not have been called
+
+    unsub2();
+    unsub2();
+
+    expect(simpleEvent.sub.subscribers).toBe(0);
   });
 
   it("should unsubscribe if the handler returns UNSUBSCRIBE", () => {
@@ -133,20 +152,26 @@ describe("SimpleEvent", () => {
         unsub3called = true;
       });
 
+      let expectedSubsCount = 4;
+
       if (bit0) {
         unsub0();
+        --expectedSubsCount;
       }
 
       if (bit1) {
         unsub1();
+        --expectedSubsCount;
       }
 
       if (bit2) {
         unsub2();
+        --expectedSubsCount;
       }
 
       if (bit3) {
         unsub3();
+        --expectedSubsCount;
       }
 
       simpleEvent.emit(1);
@@ -155,6 +180,8 @@ describe("SimpleEvent", () => {
       expect(unsub1called).toBe(!bit1);
       expect(unsub2called).toBe(!bit2);
       expect(unsub3called).toBe(!bit3);
+
+      expect(simpleEvent.sub.subscribers).toBe(expectedSubsCount);
     }
   });
 });

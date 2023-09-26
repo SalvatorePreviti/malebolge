@@ -7,7 +7,12 @@ export type SimpleEventHandlerFn<T = void> = (value: T) => void | UNSUBSCRIBE;
 
 export type SimpleEventUnsubFn = () => void;
 
-export type SimpleEventSubFn<T = void> = (handler: SimpleEventHandlerFn<T>) => SimpleEventUnsubFn;
+export type SimpleEventSubFn<T = void> = {
+  (handler: SimpleEventHandlerFn<T>): SimpleEventUnsubFn;
+
+  /** The number of subscribers */
+  readonly subscribers: number;
+};
 
 export interface SimpleEventSubscribable<T = void> {
   /**
@@ -43,9 +48,11 @@ interface StateNode<T> extends SimpleEventUnsubFn {
  *
  * @see SimpleEvent
  *
+ * This code is based on https://github.com/SalvatorePreviti/malebolge - MIT license
+ *
  * @returns A new SimpleEvent instance.
  */
-export const newSimpleEvent = <T = void>(): SimpleEvent<T> => {
+export const newSimpleEvent = /* @__PURE__ */ <T = void>(): SimpleEvent<T> => {
   let head: StateNode<T> | null | undefined;
   let tail: StateNode<T> | null | undefined;
 
@@ -54,7 +61,7 @@ export const newSimpleEvent = <T = void>(): SimpleEvent<T> => {
   // This implementation was benchmarked against the use of Array and Set (outside of the topic of this project).
   // We use the ubsub function itself as node in the linked list to reduce memory consumption and reduce dereferencing overhead.
 
-  const sub: SimpleEventSubFn<T> = (handlerFn) => {
+  const sub = ((handlerFn) => {
     const unsub: StateNode<T> = (): void => {
       const { handler, prev, next } = unsub;
       if (!handler) {
@@ -63,6 +70,7 @@ export const newSimpleEvent = <T = void>(): SimpleEvent<T> => {
 
       // Remove from the linked list
 
+      --(sub as { subscribers: number }).subscribers;
       unsub.handler = null;
       if (prev) {
         prev.next = next;
@@ -89,9 +97,12 @@ export const newSimpleEvent = <T = void>(): SimpleEvent<T> => {
       head = unsub;
     }
     tail = unsub;
+    ++(sub as { subscribers: number }).subscribers;
 
     return unsub;
-  };
+  }) as SimpleEventSubFn<T>;
+
+  (sub as { subscribers: number }).subscribers = 0;
 
   const emit = (value: T) => {
     // Loop through the linked list and call all listeners

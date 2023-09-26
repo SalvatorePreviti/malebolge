@@ -1,11 +1,58 @@
-import type { SimpleEventSubscribable } from "../core/simple-event";
+import type {
+  SimpleEventHandlerFn,
+  SimpleEventSubFn,
+  SimpleEventSubscribable,
+  SimpleEventUnsubFn,
+} from "../core/simple-event";
 import { newSimpleEvent, UNSUBSCRIBE } from "../core/simple-event";
 
-export type ReadonlyGlobalStateHandlerFn<T = unknown> = (globalState: ReadonlyGlobalState<T>) => void;
+export type ReadonlyGlobalStateUnsubFn = SimpleEventUnsubFn;
 
-export type GlobalStateHandlerFn<T> = (globalState: GlobalState<T>) => void;
+export type ReadonlyGlobalStateHandlerFn<T = unknown> = SimpleEventHandlerFn<ReadonlyGlobalState<T>>;
 
-export type GlobalStateUnsubFn = () => void;
+export type ReadonlyGlobalStateSubFn<T = unknown> = SimpleEventSubFn<ReadonlyGlobalState<T>>;
+
+export type GlobalStateUnsubFn = SimpleEventUnsubFn;
+
+export type GlobalStateHandlerFn<T = unknown> = SimpleEventHandlerFn<GlobalState<T>>;
+
+export type GlobalStateSubFn<T = unknown> = SimpleEventSubFn<GlobalState<T>>;
+
+export type GlobalStateStoreGetter = (globalState: ReadonlyGlobalState<unknown>) => GlobalStateStore;
+
+export interface ReadonlyGlobalState<T> {
+  /**
+   * Gets the current value of the state.
+   * Is a property that invokes get() internally.
+   * If you want to use this inside a react component, is advisable to instead use or call first useGlobalState() hook.
+   * If not, the component will not be re-rendered when the state changes.
+   *
+   * @see get
+   */
+  readonly value: T;
+
+  /**
+   * Get the current value of the state.
+   * If you want to use this inside a react component, is advisable to instead use or call first useGlobalState() hook.
+   * If not, the component will not be re-rendered when the state changes.
+   */
+  get: () => T;
+
+  /**
+   * Subscribe to changes in the state.
+   * @param handler A function that will be called when the state changes.
+   * @returns A function that can be called to unsubscribe the handler.
+   *
+   * @example
+   * ```ts
+   * const state = newGlobalState({ count: 0, x: 0, y: 0 });
+   * const unsub = state.sub((value) => console.log(value));
+   * state.set({ ...state.value, count: state.value.count + 1 });
+   * unsub();
+   * ```
+   */
+  sub: ReadonlyGlobalStateSubFn<T>;
+}
 
 /**
  * A global state that can be used to share data between components.
@@ -38,7 +85,7 @@ export interface GlobalState<T> extends ReadonlyGlobalState<T> {
   initial: boolean;
 
   /**
-   * The current value of the state.
+   * Gets or sets he current value of the state.
    * Is a property that invokes get() or set() internally.
    * If you want to use this inside a react component, is advisable to instead use or call first useGlobalState() hook.
    * If not, the component will not be re-rendered when the state changes.
@@ -76,6 +123,21 @@ export interface GlobalState<T> extends ReadonlyGlobalState<T> {
   set: (value: T) => void;
 
   /**
+   * Subscribe to changes in the state.
+   * @param handler A function that will be called when the state changes.
+   * @returns A function that can be called to unsubscribe the handler.
+   *
+   * @example
+   * ```ts
+   * const state = newGlobalState({ count: 0, x: 0, y: 0 });
+   * const unsub = state.sub((value) => console.log(value));
+   * state.set({ ...state.value, count: state.value.count + 1 });
+   * unsub();
+   * ```
+   */
+  sub: GlobalStateSubFn<T>;
+
+  /**
    * Reset the state to the initial value.
    *
    * @example ```ts
@@ -92,27 +154,6 @@ export interface GlobalState<T> extends ReadonlyGlobalState<T> {
    * ```
    */
   reset: () => void;
-
-  /**
-   * Subscribe to changes in the state.
-   * @param handler A function that will be called when the state changes.
-   * @returns A function that can be called to unsubscribe the handler.
-   *
-   * @example
-   * ```ts
-   * const state = newGlobalState({ count: 0, x: 0, y: 0 });
-   * const unsub = state.sub((value) => console.log(value));
-   * state.set({ ...state.value, count: state.value.count + 1 });
-   * unsub();
-   * ```
-   */
-  sub: (handler: GlobalStateHandlerFn<T>) => GlobalStateUnsubFn;
-}
-
-export interface ReadonlyGlobalState<T> {
-  readonly value: T;
-  get: () => T;
-  sub: (handler: ReadonlyGlobalStateHandlerFn<T>) => GlobalStateUnsubFn;
 }
 
 /**
@@ -141,6 +182,61 @@ interface InlineStore<T> extends ReadonlyGlobalState<T> {
 }
 
 /**
+ * The default global static store used in the frontend.
+ *
+ * A store that can be used to store global state.
+ * A global state store is required to allow storing state in a server environment or during tests.
+ * By default, a static store is used that stores the state in the state object itself as an hidden property.
+ *
+ * The store can be overridden by replacing the getStore function
+ */
+export const globalStaticStore: GlobalStateStore = {
+  getValue<T>(state: ReadonlyGlobalState<T>) {
+    return (state as InlineStore<T>)[K];
+  },
+
+  setValue<T>(state: ReadonlyGlobalState<T>, value: T | UNSET): void {
+    (state as InlineStore<T>)[K] = value;
+  },
+};
+
+/** Gets the global state store used by GlobalState and ReadonlyGlobalState */
+export const getGlobalStateStore: GlobalStateStoreGetter & {
+  /** This function can be used to override getGlobalStateStore during tests or for providing custom implementations */
+  impl: GlobalStateStoreGetter;
+} = /* @__PURE__ */ (globalState) => getGlobalStateStore.impl(globalState);
+
+getGlobalStateStore.impl = /* @__PURE__ */ () => globalStaticStore;
+
+/**
+ * A basic implementation of GlobalStateStore that uses a weak map.
+ * Useful in the backend (for server side rendering) or during tests to isolate the state.
+ * @see AgnosticCtx.globalStateStore
+ */
+export class LocalGlobalStateStore implements GlobalStateStore {
+  readonly #map: WeakMap<ReadonlyGlobalState<unknown>, unknown>;
+  public readonly parent: GlobalStateStore | null;
+
+  constructor(parent: GlobalStateStore | null = null) {
+    this.#map = new WeakMap();
+    this.parent = parent;
+  }
+
+  public getValue<T>(state: ReadonlyGlobalState<T>): T | UNSET {
+    const map = this.#map;
+    if (map.has(state)) {
+      return map.get(state) as T;
+    }
+    const parent = this.parent;
+    return parent ? parent.getValue(state) : UNSET;
+  }
+
+  public setValue<T>(state: ReadonlyGlobalState<T>, value: T | UNSET): void {
+    this.#map.set(state, value);
+  }
+}
+
+/**
  * Creates a new GlobalState instance.
  *
  * @see GlobalState
@@ -159,15 +255,6 @@ export const newGlobalState: {
   ): GlobalState<T>;
 
   <T>(initial: T): GlobalState<T>;
-
-  /**
-   * Overridable and mockable method to get the global state store.
-   *
-   * This will return a store inside an AgnosticCtx, or AsyncCtx in the backend to have an isolated store.
-   * In frontend, by default this will return the static store.
-   * This can be overridden during tests to return a different store.
-   */
-  getStore(globalState: ReadonlyGlobalState<unknown>): GlobalStateStore;
 } = /* @__PURE__ */ <T>(
   initial: T extends Function ? (state: GlobalState<T>) => T : ((state: GlobalState<T>) => T) | T,
   dependencies?: readonly SimpleEventSubscribable<unknown>[] | null | undefined | true,
@@ -177,7 +264,7 @@ export const newGlobalState: {
   let instance: GlobalState<T>;
 
   const get = (): T => {
-    const store = newGlobalState.getStore(instance);
+    const store = getGlobalStateStore(instance);
     let value = store.getValue<T>(instance);
     if (value === UNSET) {
       value = typeof initial === "function" ? initial(instance) : initial;
@@ -188,7 +275,7 @@ export const newGlobalState: {
   };
 
   const set = (value: T): void => {
-    const store = newGlobalState.getStore(instance);
+    const store = getGlobalStateStore(instance);
     const oldValue = store.getValue<T>(instance);
     if (oldValue !== value) {
       store.setValue<T>(instance, value);
@@ -199,7 +286,7 @@ export const newGlobalState: {
   };
 
   const reset = (): void => {
-    const store = newGlobalState.getStore(instance);
+    const store = getGlobalStateStore(instance);
     const oldValue = store.getValue<T>(instance);
     if (oldValue !== UNSET) {
       const value = typeof initial === "function" ? initial(instance) : initial;
@@ -231,6 +318,8 @@ export const newGlobalState: {
  * Creates a new ReadonlyGlobalState instance, that has only a getter.
  * The getter will be called every time and an event will be emitted if the value changes during get()
  *
+ * This code is based on https://github.com/SalvatorePreviti/malebolge - MIT license
+ *
  * @param getter A function that will be called every time the value is accessed.
  *
  * @returns A new ReadonlyGlobalState instance.
@@ -243,7 +332,7 @@ export const newReadonlyGlobalState = <T>(
   const { sub, emit } = newSimpleEvent<ReadonlyGlobalState<T>>();
 
   const get = (): T => {
-    const store = newGlobalState.getStore(instance);
+    const store = getGlobalStateStore(instance);
     const oldValue = store.getValue<T>(instance);
     const value = getter(instance);
 
@@ -262,52 +351,3 @@ export const newReadonlyGlobalState = <T>(
 
   return instance;
 };
-
-/**
- * The default global static store used in the frontend.
- *
- * A store that can be used to store global state.
- * A global state store is required to allow storing state in a server environment or during tests.
- * By default, a static store is used that stores the state in the state object itself as an hidden property.
- *
- * The store can be overridden by replacing the getStore function
- */
-export const globalStaticStore: GlobalStateStore = {
-  getValue<T>(state: ReadonlyGlobalState<T>) {
-    return (state as InlineStore<T>)[K];
-  },
-
-  setValue<T>(state: ReadonlyGlobalState<T>, value: T | UNSET): void {
-    (state as InlineStore<T>)[K] = value;
-  },
-};
-
-newGlobalState.getStore = /* @__PURE__ */ (): GlobalStateStore => globalStaticStore;
-
-/**
- * A basic implementation of GlobalStateStore that uses a weak map.
- * Useful in the backend (for server side rendering) or during tests to isolate the state.
- * @see AgnosticCtx.globalStateStore
- */
-export class LocalGlobalStateStore implements GlobalStateStore {
-  readonly #map: WeakMap<ReadonlyGlobalState<unknown>, unknown>;
-  public readonly parent: GlobalStateStore | null;
-
-  constructor(parent: GlobalStateStore | null = null) {
-    this.#map = new WeakMap();
-    this.parent = parent;
-  }
-
-  public getValue<T>(state: ReadonlyGlobalState<T>): T | UNSET {
-    const map = this.#map;
-    if (map.has(state)) {
-      return map.get(state) as T;
-    }
-    const parent = this.parent;
-    return parent ? parent.getValue(state) : UNSET;
-  }
-
-  public setValue<T>(state: ReadonlyGlobalState<T>, value: T | UNSET): void {
-    this.#map.set(state, value);
-  }
-}
