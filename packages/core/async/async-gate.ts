@@ -3,7 +3,9 @@ import { type AsyncStampede, asyncStampede } from "./async-stampede";
 
 /**
  * An async lock is a class that has a writable property `locked` that can be set to true or false
- * and a method `promise()` that returns a promise that resolves when `locked` is set to false.
+ * and a method `enter()` that returns a promise that resolves when `locked` is set to false.
+ *
+ * It behaves similarly to a mutex, but it is not reentrant since it has just a single locked property.
  *
  * This code is based on https://github.com/SalvatorePreviti/malebolge - MIT license
  *
@@ -48,14 +50,14 @@ export class AsyncGate {
     this.#notify = null;
     this.#notifier = null;
 
-    const executor = (resolve: () => void) => {
+    const initNotifier = (resolve: () => void) => {
       this.#notify = resolve;
     };
 
     const asyncLock = async (): Promise<void> => {
       // We run a loop to be sure that the promise is not resolved before the locked state is set to true.
       while (this.locked) {
-        await (this.#notifier || (this.#notifier = new Promise(executor)));
+        await (this.#notifier || (this.#notifier = new Promise(initNotifier)));
       }
     };
 

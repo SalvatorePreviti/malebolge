@@ -333,15 +333,20 @@ export const newReadonlyGlobalState = <T>(
 
   const { sub, emit } = newSimpleEvent<ReadonlyGlobalState<T>>();
 
+  let started = false;
   const get = (): T => {
-    const store = getGlobalStateStore(instance);
-    const oldValue = store.getValue<T>(instance);
     const value = getter(instance);
 
-    if (oldValue !== value) {
-      store.setValue<T>(instance, value);
-      if (oldValue !== UNSET) {
-        emit(instance);
+    if (sub.subscribers || started) {
+      started = true;
+      const store = getGlobalStateStore(instance);
+      const oldValue = store.getValue<T>(instance);
+
+      if (oldValue !== value) {
+        store.setValue<T>(instance, value);
+        if (oldValue !== UNSET) {
+          emit(instance);
+        }
       }
     }
     return value;
