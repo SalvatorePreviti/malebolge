@@ -190,7 +190,7 @@ interface InlineStore<T> extends ReadonlyGlobalState<T> {
  * A global state store is required to allow storing state in a server environment or during tests.
  * By default, a static store is used that stores the state in the state object itself as an hidden property.
  *
- * The store can be overridden by replacing the getStore function
+ * The store can be overridden by replacing the getGlobalStateStore.impl function
  */
 export const globalStaticStore: GlobalStateStore = {
   getValue<T>(state: ReadonlyGlobalState<T>) {
