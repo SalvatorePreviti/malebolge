@@ -355,4 +355,34 @@ describe("AsyncGate", () => {
     expect(await promise).toBe(1);
     expect(unlocked).toBe(1);
   });
+
+  it("allow passing a signal value to unlock() while the gate is locked", async () => {
+    const lock = new AsyncGate<string>();
+    lock.locked = true;
+    let unlocked = 0;
+    let raisedSignal: string | undefined = "";
+    const onEnter = (signal: string | undefined) => {
+      ++unlocked;
+      raisedSignal = signal ? signal + unlocked : signal;
+    };
+    const promise = lock.enter().then(onEnter);
+    expect(unlocked).toBe(0);
+    lock.unlock("test");
+
+    await promise;
+
+    expect(unlocked).toBe(1);
+    expect(raisedSignal).toBe("test1");
+
+    lock.locked = true;
+
+    const promise2 = lock.enter();
+
+    lock.unlock();
+
+    await promise2.then(onEnter);
+
+    expect(unlocked).toBe(2);
+    expect(raisedSignal).toBeUndefined();
+  });
 });

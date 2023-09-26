@@ -10,10 +10,10 @@ import { type AsyncStampede, asyncStampede } from "./async-stampede";
  * This code is based on https://github.com/SalvatorePreviti/malebolge - MIT license
  *
  */
-export class AsyncGate {
+export class AsyncGate<T = void> {
   #locked: boolean;
-  #notify: (() => void) | null;
-  #notifier: Promise<void> | null;
+  #notify: ((value: T | undefined) => void) | null;
+  #notifier: Promise<T | undefined> | null;
 
   /** Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function. */
   public get sub(): SimpleEventSubFn<Error | null> {
@@ -31,7 +31,7 @@ export class AsyncGate {
   /**
    * The current promise. Is null if enter() is not running, is not null while enter() is running.
    */
-  public get promise(): Promise<void> | null {
+  public get promise(): Promise<T | undefined> | null {
     return this.enter.promise;
   }
 
@@ -43,21 +43,27 @@ export class AsyncGate {
    * @param locked The initial locked state.
    * @returns {AsyncStampede<void>} A promise that resolves when `locked` is set to false. It never rejects.
    */
-  public readonly enter: AsyncStampede<void>;
+  public readonly enter: AsyncStampede<T | undefined>;
 
   public constructor(locked?: boolean) {
     this.#locked = !!locked;
     this.#notify = null;
     this.#notifier = null;
 
-    const initNotifier = (resolve: () => void) => {
+    const initNotifier = (resolve: (value: T | undefined) => void) => {
       this.#notify = resolve;
     };
 
-    const asyncLock = async (): Promise<void> => {
+    const asyncLock = async (): Promise<T | undefined> => {
+      if (!this.#locked) {
+        return undefined; // Not locked, return immediately.
+      }
       // We run a loop to be sure that the promise is not resolved before the locked state is set to true.
-      while (this.locked) {
-        await (this.#notifier || (this.#notifier = new Promise(initNotifier)));
+      for (;;) {
+        const result = await (this.#notifier || (this.#notifier = new Promise(initNotifier)));
+        if (!this.#locked) {
+          return result;
+        }
       }
     };
 
@@ -75,16 +81,32 @@ export class AsyncGate {
 
   public set locked(value: boolean) {
     if (value) {
-      this.#locked = true;
-      this.emit(null);
-    } else if (this.#locked) {
-      this.#locked = false;
-      if (this.#notify) {
-        this.#notify();
-        this.#notify = null;
-        this.#notifier = null;
-        this.emit(null);
-      }
+      this.lock();
+    } else {
+      this.unlock();
     }
+  }
+
+  public lock(): boolean {
+    if (this.#locked) {
+      return false;
+    }
+    this.#locked = true;
+    this.emit(null);
+    return true;
+  }
+
+  public unlock(signal?: T | undefined): boolean {
+    if (!this.#locked) {
+      return false;
+    }
+    this.#locked = false;
+    if (this.#notify) {
+      this.#notify(signal);
+      this.#notify = null;
+      this.#notifier = null;
+    }
+    this.emit(null);
+    return true;
   }
 }
