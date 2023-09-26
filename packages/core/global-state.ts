@@ -18,7 +18,9 @@ export type GlobalStateHandlerFn<T = unknown> = SimpleEventHandlerFn<GlobalState
 
 export type GlobalStateSubFn<T = unknown> = SimpleEventSubFn<GlobalState<T>>;
 
-export type GlobalStateStoreGetter = (globalState: ReadonlyGlobalState<unknown>) => GlobalStateStore;
+export type GlobalStateStoreGetter = (
+  globalState?: ReadonlyGlobalState<unknown> | null | undefined,
+) => GlobalStateStore;
 
 export interface ReadonlyGlobalState<T> {
   /**
