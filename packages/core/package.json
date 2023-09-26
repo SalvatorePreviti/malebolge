@@ -1,23 +1,26 @@
 {
-  "name": "@malebolge/atom",
+  "name": "@malebolge/core",
   "version": "0.0.0",
-  "description": "Atomic state pubsub",
+  "description": "Core",
   "main": "index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SalvatorePreviti/malebolge.git",
-    "directory": "packages/atom"
+    "directory": "packages/core"
   },
   "keywords": [
     "malebolge",
     "engine",
-    "atom"
+    "core"
   ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "author": "Salvatore Previti",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/SalvatorePreviti/malebolge/issues"
   },
-  "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/atom/#readme",
+  "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/math/#readme",
   "private": true
 }
