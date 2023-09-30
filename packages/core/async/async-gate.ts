@@ -1,5 +1,6 @@
-import type { SimpleEventSubFn } from "../simple-event";
-import { type AsyncStampede, asyncStampede } from "./async-stampede";
+import type { SimpleEvent } from "../core/simple-event";
+import type { AsyncStampede } from "./async-stampede";
+import { asyncStampede } from "./async-stampede";
 
 /**
  * An async lock is a class that has a writable property `locked` that can be set to true or false
@@ -16,16 +17,8 @@ export class AsyncGate<T = void> {
   #notifier: Promise<T | undefined> | null;
 
   /** Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function. */
-  public get sub(): SimpleEventSubFn<Error | null> {
+  public get sub(): SimpleEvent {
     return this.enter.sub;
-  }
-
-  /**
-   * Notifies the subscribers of the current state registered with `sub`.
-   * @param value The error to emit, or null if there was no error.
-   */
-  public get emit(): (value: Error | null) => void {
-    return this.enter.emit;
   }
 
   /**
@@ -92,7 +85,7 @@ export class AsyncGate<T = void> {
       return false;
     }
     this.#locked = true;
-    this.emit(null);
+    this.sub.emit();
     return true;
   }
 
@@ -106,7 +99,7 @@ export class AsyncGate<T = void> {
       this.#notify = null;
       this.#notifier = null;
     }
-    this.emit(null);
+    this.sub.emit(null);
     return true;
   }
 }

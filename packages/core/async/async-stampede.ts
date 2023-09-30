@@ -1,4 +1,5 @@
-import { newSimpleEvent, type SimpleEventSubFn } from "../simple-event";
+import type { SimpleEvent } from "../core/simple-event";
+import { newSimpleEvent } from "../core/simple-event";
 
 export interface AsyncStampede<T> {
   (): Promise<T>;
@@ -10,13 +11,7 @@ export interface AsyncStampede<T> {
    * Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function.
    * The argument if not null is an Error due to a reject.
    */
-  readonly sub: SimpleEventSubFn<Error | null>;
-
-  /**
-   * Notifies the subscribers of the current state registered with `sub`.
-   * @param value The error to emit, or null if there was no error.
-   */
-  readonly emit: (value: Error | null) => void;
+  readonly sub: SimpleEvent;
 }
 
 /**
@@ -44,9 +39,9 @@ export interface AsyncStampede<T> {
  * console.log(counter); // 1
  */
 export const asyncStampede = /* @__PURE__ */ <T>(fn: () => Promise<T>): AsyncStampede<T> => {
-  const { sub, emit } = newSimpleEvent<Error | null>();
+  const sub = newSimpleEvent();
 
-  const stampede = ((): Promise<T> => {
+  const stampede = (): Promise<T> => {
     if (stampede.promise) {
       return stampede.promise;
     }
@@ -60,7 +55,7 @@ export const asyncStampede = /* @__PURE__ */ <T>(fn: () => Promise<T>): AsyncSta
           resolved = undefined;
           rejected = undefined;
           resolve(value);
-          emit(null);
+          sub.emit();
         }
       };
       rejected = (error: unknown) => {
@@ -69,29 +64,23 @@ export const asyncStampede = /* @__PURE__ */ <T>(fn: () => Promise<T>): AsyncSta
           resolved = undefined;
           rejected = undefined;
           reject(error);
-          emit(error as Error);
+          sub.emit(error);
         }
       };
     });
 
     try {
-      emit(null);
+      sub.emit();
       void fn().then(resolved, rejected);
     } catch (e) {
       rejected?.(e);
     }
 
     return stampede.promise;
-  }) as {
-    (): Promise<T>;
-    promise: Promise<T> | null;
-    sub: SimpleEventSubFn<Error | null>;
-    emit: (value: Error | null) => void;
   };
 
-  stampede.promise = null;
+  stampede.promise = null as Promise<T> | null;
   stampede.sub = sub;
-  stampede.emit = emit;
 
   return stampede;
 };

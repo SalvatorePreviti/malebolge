@@ -1,4 +1,5 @@
-import { newSimpleEvent, type SimpleEventSubFn } from "../simple-event";
+import { newSimpleEvent } from "../core/simple-event";
+import type { SimpleEvent } from "../core/simple-event";
 
 export interface AsyncInitializer<T> {
   (): Promise<T>;
@@ -19,13 +20,7 @@ export interface AsyncInitializer<T> {
   readonly reset: () => boolean;
 
   /** Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function. */
-  readonly sub: SimpleEventSubFn<Error | null>;
-
-  /**
-   * Notifies the subscribers of the current state registered with `sub`.
-   * @param value The error to emit, or null if there was no error.
-   */
-  readonly emit: (value: Error | null) => void;
+  readonly sub: SimpleEvent;
 }
 
 /**
@@ -49,11 +44,11 @@ export interface AsyncInitializer<T> {
  * console.log('done');
  */
 export const asyncInitializer = /* @__PURE__ */ <T>(fn: () => Promise<T>): AsyncInitializer<T> => {
-  const { sub, emit } = newSimpleEvent<Error | null>();
+  const sub = newSimpleEvent();
 
   let resetPending = false;
 
-  const initializer = ((): Promise<T> => {
+  const initializer = (): Promise<T> => {
     if (initializer.promise) {
       return initializer.promise;
     }
@@ -74,7 +69,7 @@ export const asyncInitializer = /* @__PURE__ */ <T>(fn: () => Promise<T>): Async
             initializer.resolved = true;
             initializer.value = value;
             resolve(value);
-            emit(null);
+            sub.emit();
           }
         }
       };
@@ -86,29 +81,20 @@ export const asyncInitializer = /* @__PURE__ */ <T>(fn: () => Promise<T>): Async
           initializer.promise = null;
           resetPending = false;
           reject(error);
-          emit(error as Error);
+          sub.emit(error);
         }
       };
     });
 
     initializer.running = true;
     try {
-      emit(null);
+      sub.emit();
       void fn().then(resolved, rejected);
     } catch (e) {
       rejected?.(e);
     }
 
     return initializer.promise;
-  }) as {
-    (): Promise<T>;
-    promise: Promise<T> | null;
-    running: boolean;
-    resolved: boolean;
-    value?: T | undefined;
-    sub: SimpleEventSubFn<Error | null>;
-    emit: (value: Error | null) => void;
-    reset: () => boolean;
   };
 
   const reset = (): boolean => {
@@ -131,16 +117,17 @@ export const asyncInitializer = /* @__PURE__ */ <T>(fn: () => Promise<T>): Async
     initializer.resolved = false;
     initializer.promise = null;
     initializer.value = undefined;
-    emit(null);
+    sub.emit();
 
     return true;
   };
 
-  initializer.promise = null;
+  initializer.promise = null as Promise<T> | null;
   initializer.running = false;
   initializer.resolved = false;
   initializer.reset = reset;
   initializer.sub = sub;
+  initializer.value = undefined as T | undefined;
 
   return initializer;
 };

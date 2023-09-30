@@ -1,8 +1,8 @@
 import { setTimeout } from "timers/promises";
 
 import { describe, expect, it } from "vitest";
-import { AsyncGate, asyncInitializer, asyncStampede } from "../async";
-import { fnUndefined } from "../fns";
+import { AsyncGate, asyncInitializer, asyncStampede } from "../../async";
+import { fnUndefined } from "../../core/fns";
 
 describe("asyncInitializer", () => {
   it("returns the same promise when called multiple times", async () => {
