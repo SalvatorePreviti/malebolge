@@ -1,6 +1,5 @@
 import { newSimpleEvent, weakSimpleEventHandler } from "../../core/simple-event"; // Replace with the actual module path
 import { describe, expect, it, test } from "vitest";
-import { linkedList_size } from "../../data-structures";
 import { UNSUBSCRIBE } from "../../core/symbols";
 
 interface MyEventPayload {
@@ -29,7 +28,7 @@ describe("SimpleEvent", () => {
   it("should handle multiple subscriptions", () => {
     const simpleEvent = newSimpleEvent<MyEventPayload>();
 
-    expect(linkedList_size(simpleEvent)).toBe(0);
+    expect(simpleEvent.size).toBe(0);
 
     const values1: MyEventPayload[] = [];
     const values2: MyEventPayload[] = [];
@@ -38,13 +37,13 @@ describe("SimpleEvent", () => {
       values1.push(payload);
     });
 
-    expect(linkedList_size(simpleEvent)).toBe(1);
+    expect(simpleEvent.size).toBe(1);
 
     const unsub2 = simpleEvent((value) => {
       values2.push(value);
     });
 
-    expect(linkedList_size(simpleEvent)).toBe(2);
+    expect(simpleEvent.size).toBe(2);
 
     simpleEvent.emit({ value: 1 });
 
@@ -53,11 +52,11 @@ describe("SimpleEvent", () => {
 
     unsub1(); // Unsubscribe the first handler
 
-    expect(linkedList_size(simpleEvent)).toBe(1);
+    expect(simpleEvent.size).toBe(1);
 
     unsub1(); // this should be a no-op
 
-    expect(linkedList_size(simpleEvent)).toBe(1);
+    expect(simpleEvent.size).toBe(1);
 
     simpleEvent.emit({ value: 2 });
 
@@ -66,7 +65,7 @@ describe("SimpleEvent", () => {
 
     unsub2(); // Unsubscribe the second handler
 
-    expect(linkedList_size(simpleEvent)).toBe(0);
+    expect(simpleEvent.size).toBe(0);
 
     simpleEvent.emit({ value: 3 });
 
@@ -76,7 +75,7 @@ describe("SimpleEvent", () => {
     unsub2();
     unsub2();
 
-    expect(linkedList_size(simpleEvent)).toBe(0);
+    expect(simpleEvent.size).toBe(0);
   });
 
   it("should unsubscribe if the handler returns UNSUBSCRIBE", () => {
@@ -187,7 +186,7 @@ describe("SimpleEvent", () => {
       expect(unsub2called).toBe(!bit2);
       expect(unsub3called).toBe(!bit3);
 
-      expect(linkedList_size(simpleEvent)).toBe(expectedSubsCount);
+      expect(simpleEvent.size).toBe(expectedSubsCount);
     }
   });
 

@@ -489,11 +489,12 @@ export const linkedList_popNode = <TNode extends LinkedListNode>(
   if (!list) {
     return null;
   }
-  const node = list.tail ?? null;
+  const node = list.tail || null;
   if (node) {
-    list.tail = node.prev;
-    if (list.tail) {
-      list.tail.next = null;
+    const prev = node.prev;
+    list.tail = prev;
+    if (prev) {
+      prev.next = null;
     } else {
       list.head = null;
     }
@@ -507,15 +508,16 @@ export const linkedList_removeNode = <TNode extends LinkedListNode>(
   list: LinkedListStructure<TNode>,
   node: TNode,
 ): void => {
-  if (node.prev) {
-    node.prev.next = node.next;
+  const { prev, next } = node;
+  if (prev) {
+    prev.next = next;
   } else {
-    list.head = node.next;
+    list.head = next;
   }
-  if (node.next) {
-    node.next.prev = node.prev;
+  if (next) {
+    next.prev = prev;
   } else {
-    list.tail = node.prev;
+    list.tail = prev;
   }
   node.prev = null;
   node.next = null;
@@ -526,10 +528,11 @@ export const linkedList_unshiftNode = <TNode extends LinkedListNode>(
   list: LinkedListStructure<TNode>,
   node: TNode,
 ): void => {
+  const head = list.head;
   node.prev = null;
-  node.next = list.head ?? null;
-  if (list.head) {
-    list.head.prev = node;
+  node.next = head || null;
+  if (head) {
+    head.prev = node;
   } else {
     list.tail = node;
   }
@@ -543,16 +546,19 @@ export const linkedList_shiftNode = <TNode extends LinkedListNode>(
   if (!list) {
     return null;
   }
-  const node = list.head ?? null;
-  if (node) {
-    list.head = node.next;
-    if (list.head) {
-      list.head.prev = null;
-    } else {
-      list.tail = null;
-    }
-    node.prev = null;
+  const node = list.head;
+  if (!node) {
+    return null;
   }
+  const next = node.next;
+  if (next) {
+    list.head = next;
+    next.prev = null;
+  } else {
+    list.head = null;
+    list.tail = null;
+  }
+  node.prev = null;
   return node;
 };
 

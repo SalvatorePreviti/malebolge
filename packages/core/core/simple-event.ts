@@ -43,6 +43,9 @@ export interface SimpleEventSubscribe<TPayload = unknown> extends SimpleEventSub
 
   /** The last ubsubscriber in the linked list of subscribers, or null if empty */
   readonly tail: SimpleEventNode<TPayload> | null;
+
+  /** The number of subscribers */
+  readonly size: number;
 }
 
 export interface SimpleEvent<TPayload = unknown> extends SimpleEventSubscribe<TPayload> {
@@ -84,19 +87,20 @@ export const newSimpleEvent = /* @__PURE__ */ <TPayload = unknown>(): SimpleEven
 
       // Remove from the linked list
 
+      unsub.value = null;
       if (prev) {
-        prev.next = next;
         unsub.prev = null;
+        prev.next = next;
       } else {
         sub.head = next;
       }
       if (next) {
-        next.prev = prev;
         unsub.next = null;
+        next.prev = prev;
       } else {
         sub.tail = prev;
       }
-      unsub.value = null;
+      --sub.size;
 
       return true;
     };
@@ -107,17 +111,19 @@ export const newSimpleEvent = /* @__PURE__ */ <TPayload = unknown>(): SimpleEven
     unsub.next = null as typeof unsub.prev;
     unsub.value = handlerFn as SimpleEventHandlerFn<TPayload> | null;
 
-    if (sub.tail) {
-      sub.tail.next = unsub;
+    const tail = sub.tail;
+    if (tail) {
+      tail.next = unsub;
     } else {
       sub.head = unsub;
     }
     sub.tail = unsub;
+    ++sub.size;
 
     return unsub;
   };
 
-  const emit = ((payload: TPayload) => {
+  const emit = ((payload: TPayload): void => {
     // Loop through the linked list and call all listeners
     let node = sub.head;
     while (node) {
@@ -139,6 +145,7 @@ export const newSimpleEvent = /* @__PURE__ */ <TPayload = unknown>(): SimpleEven
 
   sub.head = null as ReturnType<typeof sub> | null;
   sub.tail = null as ReturnType<typeof sub> | null;
+  sub.size = 0;
   sub.emit = emit;
 
   return sub;
