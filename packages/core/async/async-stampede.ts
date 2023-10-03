@@ -1,5 +1,13 @@
-import type { SimpleEvent } from "../core/simple-event";
-import { newSimpleEvent } from "../core/simple-event";
+import { EMPTY_OBJECT } from "../core";
+import { notifierPubSub_new, type NotifierPubSub } from "../core/notifier-pub-sub";
+
+export interface AsyncStampedeOptions {
+  /**
+   * The event handler to use when the value changes
+   * Is useful to use the same handler for multiple observable values or to use a custom event handler.
+   */
+  sub?: NotifierPubSub | undefined;
+}
 
 export interface AsyncStampede<T> {
   (): Promise<T>;
@@ -9,9 +17,8 @@ export interface AsyncStampede<T> {
 
   /**
    * Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function.
-   * The argument if not null is an Error due to a reject.
    */
-  readonly sub: SimpleEvent;
+  readonly sub: NotifierPubSub;
 }
 
 /**
@@ -23,6 +30,7 @@ export interface AsyncStampede<T> {
  * will return the same promise.
  *
  * @param fn The function to execute.
+ * @param options The options.
  * @returns A function that returns a promise.
  *
  * @example
@@ -38,9 +46,10 @@ export interface AsyncStampede<T> {
  *
  * console.log(counter); // 1
  */
-export const asyncStampede = /* @__PURE__ */ <T>(fn: () => Promise<T>): AsyncStampede<T> => {
-  const sub = newSimpleEvent();
-
+export const asyncStampede_new = /* @__PURE__ */ <T>(
+  fn: () => Promise<T>,
+  { sub = notifierPubSub_new() }: Readonly<AsyncStampedeOptions> = EMPTY_OBJECT,
+): AsyncStampede<T> => {
   const stampede = (): Promise<T> => {
     if (stampede.promise) {
       return stampede.promise;
@@ -64,7 +73,7 @@ export const asyncStampede = /* @__PURE__ */ <T>(fn: () => Promise<T>): AsyncSta
           resolved = undefined;
           rejected = undefined;
           reject(error);
-          sub.emit(error);
+          sub.emit();
         }
       };
     });

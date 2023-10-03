@@ -1,5 +1,4 @@
-import { newSimpleEvent } from "../core/simple-event";
-import type { SimpleEventSubscribeFn, SimpleEventSubscribe, SimpleEvent } from "../core/simple-event";
+import { type NotifierSubFn, type NotifierSub, type NotifierPubSub, notifierPubSub_new } from "./notifier-pub-sub";
 import { fnEquals } from "./fns";
 import { EMPTY_OBJECT } from "./objects";
 import { UNSET } from "./symbols";
@@ -28,7 +27,7 @@ export interface ReadonlyObservableValue<T = unknown> {
    * @param handler A function that will be called when the value changes.
    * @returns A function that can be called to unsubscribe the handler.
    */
-  readonly sub: SimpleEventSubscribe;
+  readonly sub: NotifierSub;
 
   /**
    * This is an internal property used to attach an observable value to a custom store.
@@ -150,10 +149,10 @@ export interface ObservableValueOptions<T = unknown> {
   equals?: ((a: T, b: T) => boolean) | undefined;
 
   /**
-   * The event handler to be invoked when the value changes
+   * The event handler to use when the value changes
    * Is useful to use the same handler for multiple observable values or to use a custom event handler.
    */
-  sub?: SimpleEvent | undefined;
+  sub?: NotifierPubSub | undefined;
 }
 
 /**
@@ -172,7 +171,7 @@ export interface ObservableValueOptions<T = unknown> {
  */
 export const newObservableValue = /* @__PURE__ */ <T>(
   initial: T,
-  { equals = fnEquals, sub = newSimpleEvent() }: ObservableValueOptions<T> = EMPTY_OBJECT,
+  { equals = fnEquals, sub = notifierPubSub_new() }: ObservableValueOptions<T> = EMPTY_OBJECT,
 ): ResettableObservableValue<T> => {
   const get = (): T => {
     const current = get._stored;
@@ -193,7 +192,7 @@ export const newObservableValue = /* @__PURE__ */ <T>(
       }
       if (!equals(current, value)) {
         get._stored = value;
-        sub.emit(get);
+        sub.emit();
       }
     }
   };
@@ -219,7 +218,7 @@ export const newLazyObservableValue = /* @__PURE__ */ <T>(
    * @returns The initial value of the observable value.
    */
   initializer: (observableValue: ReadonlyObservableValue<T>, counter: number) => T,
-  { equals = fnEquals, sub = newSimpleEvent() }: ObservableValueOptions<T> = EMPTY_OBJECT,
+  { equals = fnEquals, sub = notifierPubSub_new() }: ObservableValueOptions<T> = EMPTY_OBJECT,
 ): ResettableObservableValue<T> => {
   const get = (): T => {
     let current = get._stored;
@@ -255,7 +254,7 @@ export const newLazyObservableValue = /* @__PURE__ */ <T>(
       }
       if (!equals(current, value)) {
         get._stored = value;
-        sub.emit(get);
+        sub.emit();
       }
     }
   };
@@ -281,11 +280,11 @@ export const newDerivedObservableValue = <T>(
    */
   derive: (this: ReadonlyObservableValue<T>, oldValue: T | undefined, observableValue: DerivedObservableValue<T>) => T,
   dependencies:
-    | Iterable<(SimpleEventSubscribeFn | { readonly sub: SimpleEventSubscribeFn }) | false | null | undefined>
+    | Iterable<(NotifierSubFn | { readonly sub: NotifierSubFn }) | false | null | undefined>
     | false
     | null
     | undefined,
-  { equals = fnEquals, sub = newSimpleEvent() }: ObservableValueOptions<T> = EMPTY_OBJECT,
+  { equals = fnEquals, sub = notifierPubSub_new() }: ObservableValueOptions<T> = EMPTY_OBJECT,
 ): DerivedObservableValue<T> => {
   const get = (): T => {
     let stored = get._stored;
@@ -306,7 +305,7 @@ export const newDerivedObservableValue = <T>(
     const value = get._getter(current, get);
     if (!equals(current, value)) {
       get._stored = value;
-      sub.emit(get);
+      sub.emit();
     }
     return value;
   };
@@ -336,7 +335,7 @@ export const newDerivedObservableValue = <T>(
 
 export const newGetterObservableValue = /* @__PURE__ */ <T>(
   getter: (this: ReadonlyObservableValue<T>, oldValue: T | undefined, observableValue: ReadonlyObservableValue<T>) => T,
-  { equals = fnEquals, sub = newSimpleEvent() }: ObservableValueOptions<T> = EMPTY_OBJECT,
+  { equals = fnEquals, sub = notifierPubSub_new() }: ObservableValueOptions<T> = EMPTY_OBJECT,
 ): ReadonlyObservableValue<T> => {
   const get = (): T => {
     const stored = get._stored;
@@ -348,7 +347,7 @@ export const newGetterObservableValue = /* @__PURE__ */ <T>(
       value = get._getter(stored, get);
       if (!equals(stored, value)) {
         get._stored = value;
-        sub.emit(get);
+        sub.emit();
       }
     }
     return value;

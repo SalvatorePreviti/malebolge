@@ -1,5 +1,13 @@
-import { newSimpleEvent } from "../core/simple-event";
-import type { SimpleEvent } from "../core/simple-event";
+import { EMPTY_OBJECT } from "../core";
+import { notifierPubSub_new, type NotifierPubSub } from "../core/notifier-pub-sub";
+
+export interface AsyncInitializerOptions {
+  /**
+   * The event handler to use when the value changes
+   * Is useful to use the same handler for multiple observable values or to use a custom event handler.
+   */
+  sub?: NotifierPubSub | undefined;
+}
 
 export interface AsyncInitializer<T> {
   (): Promise<T>;
@@ -20,7 +28,7 @@ export interface AsyncInitializer<T> {
   readonly reset: () => boolean;
 
   /** Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function. */
-  readonly sub: SimpleEvent;
+  readonly sub: NotifierPubSub;
 }
 
 /**
@@ -30,6 +38,7 @@ export interface AsyncInitializer<T> {
  *
  * @param fn The function to execute. The function will be executed only once if is successful.
  * On error it will be retried on next invocation.
+ * @param options The options.
  * @returns A function that returns a promise.
  *
  * @example
@@ -43,9 +52,10 @@ export interface AsyncInitializer<T> {
  *
  * console.log('done');
  */
-export const asyncInitializer = /* @__PURE__ */ <T>(fn: () => Promise<T>): AsyncInitializer<T> => {
-  const sub = newSimpleEvent();
-
+export const asyncInitializer_new = /* @__PURE__ */ <T>(
+  fn: () => Promise<T>,
+  { sub = notifierPubSub_new() }: Readonly<AsyncInitializerOptions> = EMPTY_OBJECT,
+): AsyncInitializer<T> => {
   let resetPending = false;
 
   const initializer = (): Promise<T> => {
@@ -81,7 +91,7 @@ export const asyncInitializer = /* @__PURE__ */ <T>(fn: () => Promise<T>): Async
           initializer.promise = null;
           resetPending = false;
           reject(error);
-          sub.emit(error);
+          sub.emit();
         }
       };
     });
