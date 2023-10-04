@@ -47,10 +47,9 @@ export interface NotifierPubSub extends NotifierSub {
 
 const _UNSUBSCRIBE = UNSUBSCRIBE;
 const _EMIT_QUEUE_NEXT = Symbol("emitQueueNext");
-const _EMIT_QUEUE_END = 0 as const;
 
 interface EmitQueueNode extends NotifierEmitFn {
-  [_EMIT_QUEUE_NEXT]: EmitQueueNode | typeof _EMIT_QUEUE_END | null;
+  [_EMIT_QUEUE_NEXT]: EmitQueueNode | false | null;
 }
 
 let _iter: NotifierUnsub | null | undefined;
@@ -61,24 +60,10 @@ let _emitHead: EmitQueueNode | null | undefined;
 let _emitTail: EmitQueueNode | null | undefined;
 let _emitFlushing: boolean | undefined;
 
-function _emitQueueAdd(emit: EmitQueueNode) {
-  const next = emit[_EMIT_QUEUE_NEXT];
-  if (!next && next !== _EMIT_QUEUE_END) {
-    emit[_EMIT_QUEUE_NEXT] = _EMIT_QUEUE_END;
-    if (_emitTail) {
-      _emitTail[_EMIT_QUEUE_NEXT] = emit;
-    } else {
-      _emitHead = emit;
-    }
-    _emitTail = emit;
-  }
-}
-
 const _emitFlush = () => {
   if (_emitFlushing) {
     return; // Another flushing already in progress
   }
-
   _emitFlushing = true;
   try {
     for (;;) {
@@ -181,42 +166,53 @@ export const notifierPubSub_new = /* @__PURE__ */ (): NotifierPubSub => {
         _iter = sub.head;
       } else if (sub.head) {
         // Another emit is in progress and this subscriber is not empty, we need to enqueue this emit.
-        _emitQueueAdd(emit);
+        const next = emit[_EMIT_QUEUE_NEXT];
+        if (!next && next !== false) {
+          emit[_EMIT_QUEUE_NEXT] = false;
+          if (_emitTail) {
+            _emitTail[_EMIT_QUEUE_NEXT] = emit;
+          } else {
+            _emitHead = emit;
+          }
+          _emitTail = emit;
+        }
       }
       return;
     }
 
     _iter = sub.head;
-    if (_iter) {
-      _iterSub = sub;
-      try {
-        do {
-          const iter: NotifierUnsubNode = _iter;
-          const value = iter.value;
-          if (value === null) {
-            // Edge case: a node that is after the current node was deleted inside an handler while iterating.
-            // We need to restart from the beginning to ensure all handlers are notified.
-            _iter = sub.head;
-          } else {
-            _iter = iter.next; // Advance the iterator
+    if (!_iter) {
+      return; // Empty subscriber
+    }
 
-            // We avoid emitting if the previous handler was the same, a small optimization
-            // if the same handler was registered multiple times.
-            if (value !== _iterHandler) {
-              _iterHandler = value;
+    _iterSub = sub;
+    try {
+      do {
+        const iter: NotifierUnsubNode = _iter;
+        const value = iter.value;
+        if (!value) {
+          // Edge case: a node that is after the current node was deleted inside an handler while iterating.
+          // We need to restart from the beginning to ensure all handlers are notified.
+          _iter = sub.head;
+        } else {
+          _iter = iter.next; // Advance the iterator
 
-              // Invoke the listener.
-              if (value() === _UNSUBSCRIBE) {
-                iter(); // Remove the node
-              }
+          // We avoid emitting if the previous handler was the same, a small optimization
+          // if the same handler was registered multiple times.
+          if (value !== _iterHandler) {
+            _iterHandler = value;
+
+            // Invoke the listener.
+            if (value() === _UNSUBSCRIBE) {
+              iter(); // Remove the node
             }
           }
-        } while (_iter);
-      } finally {
-        _iter = null;
-        _iterSub = null;
-        _iterHandler = null;
-      }
+        }
+      } while (_iter);
+    } finally {
+      _iterSub = null;
+      _iter = null;
+      _iterHandler = null;
     }
 
     if (_emitHead) {
@@ -252,9 +248,8 @@ export const notifierPubSub_flush = (): boolean => {
  * @param sub The NotifierPubSub instance.
  */
 export const notifierPubSub_clear = (sub: NotifierSub): void => {
-  let node = sub.head as NotifierUnsubNode | null;
-  while (node) {
-    const next = node.next;
+  for (let node = sub.head as NotifierUnsubNode | null, next: NotifierUnsubNode | null; node; node = next) {
+    next = node.next;
     if (node === _iter) {
       _iter = null;
       _iterHandler = null;
@@ -262,19 +257,10 @@ export const notifierPubSub_clear = (sub: NotifierSub): void => {
     node.value = null;
     node.prev = null;
     node.next = null;
-    node = next;
   }
   (sub as { head: null }).head = null;
   (sub as { tail: null }).tail = null;
 };
-
-/**
- * Returns true if an emit is in progress.
- * If no sub is passed it returns true if any emit is in progress.
- * @param sub The NotifierPubSub instance to check.
- * @returns True if an emit is in progress.
- */
-export const notifierPubSub_isEmitting = (sub?: NotifierSub): boolean => (sub ? _iterSub === sub : !!_iterSub);
 
 /**
  * Returns true if the NotifierPubSub instance is empty.
@@ -317,7 +303,15 @@ export const notifierPubSub_includes: (sub: NotifierSub | null | undefined, hand
  * @see notifierPubSub_lock
  * @see notifierPubSub_batch
  */
-export const notifierPubSub_locked = (): boolean => _emitLock > 0;
+export const notifierPubSub_isLocked = (): boolean => _emitLock > 0;
+
+/**
+ * Returns true if an emit is in progress.
+ * If no sub is passed it returns true if any emit is in progress.
+ * @param sub The NotifierPubSub instance to check.
+ * @returns True if an emit is in progress.
+ */
+export const notifierPubSub_isEmitting = (sub?: NotifierSub): boolean => (sub ? _iterSub === sub : !!_iterSub);
 
 /**
  * Batch emits, they will be executed after the returned dispose function is called.
@@ -328,18 +322,19 @@ export const notifierPubSub_locked = (): boolean => _emitLock > 0;
  *
  * @returns A dispose function that will execute the batched emits.
  */
-export const notifierPubSub_lock = (): (() => void) => {
-  ++_emitLock;
-  let ended = false;
-  const unlock = () => {
-    if (!ended) {
-      ended = true;
-      --_emitLock;
-      if (_emitHead) {
-        _emitFlush();
-      }
+export const notifierPubSub_lock = (): (() => boolean) => {
+  let unlock = () => {
+    if (!unlock) {
+      return false;
     }
+    unlock = null!;
+    --_emitLock;
+    if (_emitHead) {
+      _emitFlush();
+    }
+    return true;
   };
+  ++_emitLock;
   return unlock;
 };
 
@@ -352,8 +347,8 @@ export const notifierPubSub_lock = (): (() => void) => {
  * @returns The result of the given function.
  */
 export const notifierPubSub_batch = <R = void>(fn: () => R): R => {
-  ++_emitLock;
   let result: R;
+  ++_emitLock;
   try {
     result = fn();
   } finally {
