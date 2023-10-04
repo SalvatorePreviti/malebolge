@@ -1,13 +1,11 @@
 import { linkedList_includesValue, linkedList_isEmpty, linkedList_size } from "../data-structures";
 import { UNSUBSCRIBE } from "./symbols";
 
-export type NotifierHandler = () => void | UNSUBSCRIBE | unknown;
+export type NotifierHandler = (sender?: NotifierEmitFn) => void | UNSUBSCRIBE | unknown;
 
 export type NotifierEmitFn = () => void;
 
-export interface NotifierEmit extends NotifierEmitFn {
-  [Symbol.dispose]: NotifierEmitFn;
-}
+export type NotifierEmit = NotifierEmitFn;
 
 export type NotifierUnsubFn = () => boolean;
 
@@ -24,7 +22,7 @@ export interface NotifierUnsub extends NotifierUnsubFn {
   readonly next: this | null;
 }
 
-export interface NotifierSub {
+export interface NotifierSub extends NotifierSubFn {
   (handler: NotifierHandler): NotifierUnsub;
 
   /** The first ubsubscriber in the linked list of subscribers, or null if empty */
@@ -45,29 +43,29 @@ export interface NotifierPubSub extends NotifierSub, NotifierEmitFn {
 const _UNSUBSCRIBE = UNSUBSCRIBE;
 const _EMIT_QUEUE_NEXT = Symbol("emitQueueNext");
 
+interface NotifierUnsubNode extends NotifierUnsub {
+  value: NotifierHandler | null;
+  prev: this | null;
+  next: this | null;
+}
+
 interface Notifier extends NotifierPubSub {
   head: NotifierUnsubNode | null;
   tail: NotifierUnsubNode | null;
   [_EMIT_QUEUE_NEXT]: EmitQueueNode | false | null;
 }
 
-interface NotifierUnsubNode extends NotifierUnsubFn {
-  value: NotifierHandler | null;
-  prev: NotifierUnsub | null;
-  next: NotifierUnsub | null;
-}
-
 interface EmitQueueNode extends NotifierEmitFn {
   [_EMIT_QUEUE_NEXT]: EmitQueueNode | false | null;
 }
 
-let _iter: NotifierUnsub | null | undefined;
-let _iterSub: NotifierSub | null | undefined;
+let _iter: NotifierUnsub | null = null;
+let _iterSub: NotifierSub | null = null;
 let _iterHandler: NotifierHandler | null | undefined;
+let _emitHead: EmitQueueNode | null = null;
+let _emitTail: EmitQueueNode | null = null;
+let _emitFlushing = false;
 let _emitLock = 0;
-let _emitHead: EmitQueueNode | null | undefined;
-let _emitTail: EmitQueueNode | null | undefined;
-let _emitFlushing: boolean | undefined;
 
 const _emitFlush = () => {
   if (_emitFlushing) {
@@ -115,7 +113,7 @@ const _emitEnqueue = (sub: Notifier) => {
   }
 };
 
-const makeUnsub = (sub: Notifier, handler: NotifierHandler) => {
+const _subscribe = (sub: Notifier, handler: NotifierHandler) => {
   const unsub = (): boolean => {
     const { value, prev, next } = unsub;
 
@@ -145,6 +143,7 @@ const makeUnsub = (sub: Notifier, handler: NotifierHandler) => {
 
     return true;
   };
+
   const tail = sub.tail;
 
   unsub.prev = tail;
@@ -187,7 +186,7 @@ export const notifierPubSub_new = /* @__PURE__ */ (): NotifierPubSub => {
   const sub = ((handler?: NotifierHandler) => {
     if (handler) {
       // Add to the linked list.
-      return makeUnsub(sub, handler);
+      return _subscribe(sub, handler);
     }
 
     // Emit the event
@@ -216,7 +215,7 @@ export const notifierPubSub_new = /* @__PURE__ */ (): NotifierPubSub => {
               _iterHandler = value;
 
               // Invoke the listener.
-              if (value() === _UNSUBSCRIBE) {
+              if (value(sub) === _UNSUBSCRIBE) {
                 iter(); // Remove the node
               }
             }
