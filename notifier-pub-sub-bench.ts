@@ -29,7 +29,7 @@ console.timeEnd("subscribe");
 
 console.time("publish");
 for (let i = 0; i < SIZE; i++) {
-  notifiers[i]!.emit();
+  notifiers[i]!();
 }
 console.timeEnd("publish");
 

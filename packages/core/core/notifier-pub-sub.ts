@@ -24,12 +24,6 @@ export interface NotifierUnsub extends NotifierUnsubFn {
   readonly next: this | null;
 }
 
-interface NotifierUnsubNode extends NotifierUnsubFn {
-  value: NotifierHandler | null;
-  prev: NotifierUnsub | null;
-  next: NotifierUnsub | null;
-}
-
 export interface NotifierSub {
   (handler: NotifierHandler): NotifierUnsub;
 
@@ -40,13 +34,28 @@ export interface NotifierSub {
   readonly tail: NotifierUnsub | null;
 }
 
-export interface NotifierPubSub extends NotifierSub {
-  /** Emit the event. */
-  emit: NotifierEmitFn;
+export interface NotifierPubSub extends NotifierSub, NotifierEmitFn {
+  /** Register a new subscriber. */
+  (handler: NotifierHandler): NotifierUnsub;
+
+  /** Emit the event to all subscribers. */
+  (): void;
 }
 
 const _UNSUBSCRIBE = UNSUBSCRIBE;
 const _EMIT_QUEUE_NEXT = Symbol("emitQueueNext");
+
+interface Notifier extends NotifierPubSub {
+  head: NotifierUnsubNode | null;
+  tail: NotifierUnsubNode | null;
+  [_EMIT_QUEUE_NEXT]: EmitQueueNode | false | null;
+}
+
+interface NotifierUnsubNode extends NotifierUnsubFn {
+  value: NotifierHandler | null;
+  prev: NotifierUnsub | null;
+  next: NotifierUnsub | null;
+}
 
 interface EmitQueueNode extends NotifierEmitFn {
   [_EMIT_QUEUE_NEXT]: EmitQueueNode | false | null;
@@ -86,6 +95,72 @@ const _emitFlush = () => {
   }
 };
 
+const _emitEnqueue = (sub: Notifier) => {
+  if (_iterSub === sub) {
+    // We are already emitting this subscriber, we need to reset the iteration to the beginning.
+    _iterHandler = null;
+    _iter = sub.head;
+  } else if (sub.head) {
+    // Another emit is in progress and this subscriber is not empty, we need to enqueue this emit.
+    const next = sub[_EMIT_QUEUE_NEXT];
+    if (!next && next !== false) {
+      sub[_EMIT_QUEUE_NEXT] = false;
+      if (_emitTail) {
+        _emitTail[_EMIT_QUEUE_NEXT] = sub;
+      } else {
+        _emitHead = sub;
+      }
+      _emitTail = sub;
+    }
+  }
+};
+
+const makeUnsub = (sub: Notifier, handler: NotifierHandler) => {
+  const unsub = (): boolean => {
+    const { value, prev, next } = unsub;
+
+    if (!value) {
+      return false; // Already unsubscribed
+    }
+
+    // Remove from the linked list
+
+    if (prev) {
+      prev.next = next;
+    } else {
+      sub.head = next;
+    }
+    if (next) {
+      next.prev = prev;
+    } else {
+      sub.tail = prev;
+    }
+    unsub.prev = null;
+    unsub.next = null;
+    unsub.value = null;
+
+    if (_iter === unsub) {
+      _iter = next; // We are currently iterating this subscriber, we need to advance the iterator.
+    }
+
+    return true;
+  };
+  const tail = sub.tail;
+
+  unsub.prev = tail;
+  unsub.next = null as typeof unsub.prev;
+  unsub.value = handler as NotifierHandler | null;
+
+  sub.tail = unsub;
+  if (tail) {
+    tail.next = unsub;
+  } else {
+    sub.head = unsub;
+  }
+
+  return unsub;
+};
+
 /**
  * Creates a new NotifierPubSub instance.
  *
@@ -109,123 +184,61 @@ const _emitFlush = () => {
  * @returns A new NotifierPubSub instance.
  */
 export const notifierPubSub_new = /* @__PURE__ */ (): NotifierPubSub => {
-  const sub = (handler: NotifierHandler) => {
-    const tail = sub.tail;
-
-    const unsub = (): boolean => {
-      const { value, prev, next } = unsub;
-
-      if (!value) {
-        return false; // Already unsubscribed
-      }
-
-      // Remove from the linked list
-
-      if (prev) {
-        prev.next = next;
-      } else {
-        sub.head = next;
-      }
-      if (next) {
-        next.prev = prev;
-      } else {
-        sub.tail = prev;
-      }
-      unsub.prev = null;
-      unsub.next = null;
-      unsub.value = null;
-
-      if (_iter === unsub) {
-        _iter = next; // We are currently iterating this subscriber, we need to advance the iterator.
-      }
-
-      return true;
-    };
-
-    // Add to the linked list.
-
-    unsub.prev = tail;
-    unsub.next = null as typeof unsub.prev;
-    unsub.value = handler as NotifierHandler | null;
-
-    sub.tail = unsub;
-    if (tail) {
-      tail.next = unsub;
-    } else {
-      sub.head = unsub;
+  const sub = ((handler?: NotifierHandler) => {
+    if (handler) {
+      // Add to the linked list.
+      return makeUnsub(sub, handler);
     }
 
-    return unsub;
-  };
+    // Emit the event
 
-  const emit: EmitQueueNode = (): void => {
     if (_iterSub || _emitLock) {
-      if (_iterSub === sub) {
-        // We are already emitting this subscriber, we need to reset the iteration to the beginning.
-        _iterHandler = null;
-        _iter = sub.head;
-      } else if (sub.head) {
-        // Another emit is in progress and this subscriber is not empty, we need to enqueue this emit.
-        const next = emit[_EMIT_QUEUE_NEXT];
-        if (!next && next !== false) {
-          emit[_EMIT_QUEUE_NEXT] = false;
-          if (_emitTail) {
-            _emitTail[_EMIT_QUEUE_NEXT] = emit;
-          } else {
-            _emitHead = emit;
-          }
-          _emitTail = emit;
-        }
-      }
-      return;
+      return _emitEnqueue(sub);
     }
 
     _iter = sub.head;
-    if (!_iter) {
-      return; // Empty subscriber
-    }
+    if (_iter) {
+      _iterSub = sub;
+      try {
+        do {
+          const iter: NotifierUnsubNode = _iter;
+          const value = iter.value;
+          if (!value) {
+            // Edge case: a node that is after the current node was deleted inside an handler while iterating.
+            // We need to restart from the beginning to ensure all handlers are notified.
+            _iter = sub.head;
+          } else {
+            _iter = iter.next; // Advance the iterator
 
-    _iterSub = sub;
-    try {
-      do {
-        const iter: NotifierUnsubNode = _iter;
-        const value = iter.value;
-        if (!value) {
-          // Edge case: a node that is after the current node was deleted inside an handler while iterating.
-          // We need to restart from the beginning to ensure all handlers are notified.
-          _iter = sub.head;
-        } else {
-          _iter = iter.next; // Advance the iterator
+            // We avoid emitting if the previous handler was the same, a small optimization
+            // if the same handler was registered multiple times.
+            if (value !== _iterHandler) {
+              _iterHandler = value;
 
-          // We avoid emitting if the previous handler was the same, a small optimization
-          // if the same handler was registered multiple times.
-          if (value !== _iterHandler) {
-            _iterHandler = value;
-
-            // Invoke the listener.
-            if (value() === _UNSUBSCRIBE) {
-              iter(); // Remove the node
+              // Invoke the listener.
+              if (value() === _UNSUBSCRIBE) {
+                iter(); // Remove the node
+              }
             }
           }
-        }
-      } while (_iter);
-    } finally {
-      _iterSub = null;
-      _iter = null;
-      _iterHandler = null;
+        } while (_iter);
+      } finally {
+        _iterSub = null;
+        _iter = null;
+        _iterHandler = null;
+      }
     }
 
     if (_emitHead) {
-      // Another emit happened while we were emitting, and it was added to the queue we need to flush the queue.
       _emitFlush();
     }
-  };
 
-  sub.head = null as NotifierUnsubNode | null;
-  sub.tail = null as NotifierUnsubNode | null;
-  sub.emit = emit;
+    return undefined;
+  }) as Notifier;
 
-  emit[_EMIT_QUEUE_NEXT] = null;
+  sub.head = null;
+  sub.tail = null;
+  sub[_EMIT_QUEUE_NEXT] = null;
 
   return sub;
 };

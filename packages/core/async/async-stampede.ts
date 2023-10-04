@@ -64,7 +64,7 @@ export const asyncStampede_new = /* @__PURE__ */ <T>(
           resolved = undefined;
           rejected = undefined;
           resolve(value);
-          sub.emit();
+          sub();
         }
       };
       rejected = (error: unknown) => {
@@ -73,13 +73,13 @@ export const asyncStampede_new = /* @__PURE__ */ <T>(
           resolved = undefined;
           rejected = undefined;
           reject(error);
-          sub.emit();
+          sub();
         }
       };
     });
 
     try {
-      sub.emit();
+      sub();
       void fn().then(resolved, rejected);
     } catch (e) {
       rejected?.(e);

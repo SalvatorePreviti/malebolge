@@ -79,7 +79,7 @@ export const asyncInitializer_new = /* @__PURE__ */ <T>(
             initializer.resolved = true;
             initializer.value = value;
             resolve(value);
-            sub.emit();
+            sub();
           }
         }
       };
@@ -91,14 +91,14 @@ export const asyncInitializer_new = /* @__PURE__ */ <T>(
           initializer.promise = null;
           resetPending = false;
           reject(error);
-          sub.emit();
+          sub();
         }
       };
     });
 
     initializer.running = true;
     try {
-      sub.emit();
+      sub();
       void fn().then(resolved, rejected);
     } catch (e) {
       rejected?.(e);
@@ -127,7 +127,7 @@ export const asyncInitializer_new = /* @__PURE__ */ <T>(
     initializer.resolved = false;
     initializer.promise = null;
     initializer.value = undefined;
-    sub.emit();
+    sub();
 
     return true;
   };

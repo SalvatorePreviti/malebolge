@@ -8,18 +8,18 @@ describe("notifierPubSub", () => {
     let called = 0;
     const unsub = onChange(() => ++called);
 
-    onChange.emit();
+    onChange();
 
     expect(called).toBe(1);
 
-    onChange.emit();
+    onChange();
 
     expect(called).toBe(2);
 
     unsub(); // Unsubscribe
 
-    onChange.emit();
-    onChange.emit();
+    onChange();
+    onChange();
 
     expect(called).toBe(2); // Should not have been called after unsubscribing
   });
@@ -40,7 +40,7 @@ describe("notifierPubSub", () => {
 
     expect(linkedList_size(onChange)).toBe(2);
 
-    onChange.emit();
+    onChange();
 
     expect(calls1).toBe(1);
     expect(calls2).toBe(1);
@@ -53,7 +53,7 @@ describe("notifierPubSub", () => {
 
     expect(linkedList_size(onChange)).toBe(1);
 
-    onChange.emit();
+    onChange();
 
     expect(calls1).toBe(1); // First handler should not have been called
     expect(calls2).toBe(2);
@@ -62,7 +62,7 @@ describe("notifierPubSub", () => {
 
     expect(linkedList_size(onChange)).toBe(0);
 
-    onChange.emit();
+    onChange();
 
     expect(calls1).toBe(1); // First handler should still not have been called
     expect(calls2).toBe(2); // Second handler should still not have been called
@@ -70,7 +70,7 @@ describe("notifierPubSub", () => {
     unsub2();
     unsub2();
 
-    onChange.emit();
+    onChange();
 
     expect(calls1).toBe(1);
     expect(calls2).toBe(2);
@@ -87,11 +87,11 @@ describe("notifierPubSub", () => {
       return UNSUBSCRIBE;
     });
 
-    onChange.emit();
+    onChange();
 
     expect(calls).toBe(1);
 
-    onChange.emit();
+    onChange();
 
     expect(calls).toBe(1);
   });
@@ -116,19 +116,19 @@ describe("notifierPubSub", () => {
     expect(evt1).toBe(0);
     expect(evt2).toBe(0);
 
-    onChange.emit();
+    onChange();
 
     expect(evt1).toBe(1);
     expect(evt2).toBe(0);
 
     unsub1();
 
-    onChange.emit();
+    onChange();
 
     expect(evt1).toBe(1);
     expect(evt2).toBe(0);
 
-    onChange.emit();
+    onChange();
 
     expect(evt1).toBe(1);
     expect(evt2).toBe(0);
@@ -187,7 +187,7 @@ describe("notifierPubSub", () => {
         --expectedSubsCount;
       }
 
-      onChange.emit();
+      onChange();
 
       expect(unsub0called).toBe(!bit0);
       expect(unsub1called).toBe(!bit1);
@@ -204,10 +204,10 @@ describe("notifierPubSub", () => {
       let calls = 0;
       onChange(() => {
         if (++calls < 5) {
-          onChange.emit();
+          onChange();
         }
       });
-      onChange.emit();
+      onChange();
       expect(calls).toBe(5);
     });
 
@@ -222,23 +222,23 @@ describe("notifierPubSub", () => {
 
       onChange3(() => {
         if (++calls3 < 5) {
-          onChange1.emit();
+          onChange1();
         }
       });
 
       onChange2(() => {
         if (calls2++ < 5) {
-          onChange1.emit();
+          onChange1();
         }
       });
 
       onChange1(() => {
         if (++calls1 < 5) {
-          onChange2.emit();
+          onChange2();
         }
       });
 
-      onChange3.emit();
+      onChange3();
 
       expect(calls3).toBe(1);
       expect(calls2).toBe(4);

@@ -48,7 +48,7 @@ export const asyncGate_new = <T = void>(options: Readonly<AsyncGateOptions> | bo
       return false;
     }
     instance.locked = true;
-    instance.sub.emit();
+    instance.sub();
     return true;
   };
 
@@ -62,7 +62,7 @@ export const asyncGate_new = <T = void>(options: Readonly<AsyncGateOptions> | bo
       notify = null;
       notifier = null;
     }
-    instance.sub.emit();
+    instance.sub();
     return true;
   };
 
