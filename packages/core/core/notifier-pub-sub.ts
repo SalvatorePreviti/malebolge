@@ -4,7 +4,7 @@ import { fnUndefined } from "./fns";
 import { UNSUBSCRIBE } from "./symbols";
 
 /** The type of a function that can be used as subscriber in a NotifierPubSub instance. */
-export type NotifierHandler = (sender?: NotifierPubSub) => void | UNSUBSCRIBE | unknown;
+export type NotifierHandler = () => void | UNSUBSCRIBE | unknown;
 
 /** The type of the publish function for a NotifierPubSub */
 export type NotifierPubFn = () => void;
@@ -31,7 +31,25 @@ export interface NotifierUnsubNode extends NotifierUnsubFn {
   readonly next: this | null;
 }
 
-export interface NotifierPubSub extends NotifierPubSubFn {
+export interface NotifierSub extends NotifierSubFn {
+  /**
+   * Register a subscriber
+   * @param handler The handler to be invoked when the event is emitted.
+   * @returns A function to unsubscribe the handler.
+   */
+  (handler: NotifierHandler): NotifierUnsubNode;
+
+  /** The first subscriber in the linked list, or null if empty. */
+  readonly head: NotifierUnsubNode | null;
+
+  /** The last subscriber in the linked list, or null if empty. */
+  readonly tail: NotifierUnsubNode | null;
+
+  /** The number of subscribers. */
+  readonly size: number;
+}
+
+export interface NotifierPubSub extends NotifierPubSubFn, NotifierSub {
   /**
    * Register a subscriber
    * @param handler The handler to be invoked when the event is emitted.
@@ -197,7 +215,7 @@ function publish<TSelf extends NotifierPubSub>(this: TSelf) {
               _pubValue = value;
 
               // Invoke the listener.
-              if (value(this) === _UNSUBSCRIBE) {
+              if (value() === _UNSUBSCRIBE) {
                 iter(); // Remove the node
               }
             }
@@ -295,10 +313,11 @@ export const notifierPubSub_new = (): NotifierPubSub => {
 
 /**
  * Gets a ()=>void function that invokes an emit on the given NotifierPubSub instance.
+ * It always returns the same function for the same NotifierPubSub instance.
  * This is needed sometimes when you need an emit that does not have any parameter.
  * We do not create an additional emit() property to reduce the memory footprint.
  *
- * The function is cached.
+ * This is also useful to hide the subscribe and unsubscribe from the public API, exposing just an emit function.
  *
  * @param notifier The NotifierPubSub instance. If null or undefined or false, returns a function that does nothing.
  * @returns A function that invokes an emit on the given NotifierPubSub instance.
@@ -310,15 +329,13 @@ export const notifierPubSub_emitter = (notifier: NotifierPubSubFn | null | undef
 
 /**
  * Removes all subscribers from a NotifierPubSub instance.
- * @param notifier
- * @returns
+ * @param notifier The NotifierPubSub instance.
  */
-export const notifierPubSub_clear = (notifier: NotifierPubSub | null | undefined): boolean => {
+export const notifierPubSub_clear = (notifier: NotifierPubSub | null | undefined): void => {
   for (let node = notifier?.head, next; node; node = next) {
     next = node.next;
     node();
   }
-  return true;
 };
 
 /**
@@ -356,6 +373,7 @@ export const notifierPubSub_includes = (
  * Batch emits, they will be executed after the returned dispose function is called.
  * Try to limit locking the emit to avoid blocking other events or breaking application logic.
  * It makes sense only for batching multiple emits in a single unit of work and should not be abused.
+ * Try to not use this asynchronously, since it will pause the notifications of the whole application while the promise is running.
  *
  * The lock is global and shared between all NotifierPubSub instances.
  *
