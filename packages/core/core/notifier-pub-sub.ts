@@ -45,11 +45,17 @@ export interface NotifierSub extends NotifierSubFn {
   /** The last subscriber in the linked list, or null if empty. */
   readonly tail: NotifierUnsubNode | null;
 
-  /** The number of subscribers. */
-  readonly size: number;
+  /**
+   * Checks if the NotifierPubSub has subscribers and emit should be called.
+   * @param this
+   */
+  shouldEmit(this: this): boolean;
 }
 
 export interface NotifierPubSub extends NotifierPubSubFn, NotifierSub {
+  /** The parent NotifierPubSub instance */
+  readonly parent?: NotifierPubSub | undefined;
+
   /**
    * Register a subscriber
    * @param handler The handler to be invoked when the event is emitted.
@@ -59,15 +65,6 @@ export interface NotifierPubSub extends NotifierPubSubFn, NotifierSub {
 
   /** Emit the notification to all subscribers */
   (): void;
-
-  /** The first subscriber in the linked list, or null if empty. */
-  readonly head: NotifierUnsubNode | null;
-
-  /** The last subscriber in the linked list, or null if empty. */
-  readonly tail: NotifierUnsubNode | null;
-
-  /** The number of subscribers. */
-  readonly size: number;
 
   /**
    * Emit the event to all subscribers.
@@ -91,6 +88,11 @@ export interface NotifierPubSub extends NotifierPubSubFn, NotifierSub {
   _unsub(this: this, node: NotifierUnsubNode): boolean;
 }
 
+export interface NotifierPubSubExtended extends NotifierPubSub {
+  /** The parent NotifierPubSub instance */
+  readonly parent: NotifierPubSub;
+}
+
 interface NotifierUnsubWritableNode extends NotifierUnsubNode {
   /** The function to be invoked when the event is emitted. Is null if the handler was unsubscribed. */
   value: NotifierHandler | null;
@@ -108,8 +110,6 @@ interface NotifierPubSubWritable extends NotifierPubSub {
 
   /** The last NotifierPubSub instance in the linked list, or null if empty */
   tail: NotifierUnsubWritableNode | null;
-
-  size: number;
 }
 
 const _UNSUBSCRIBE = UNSUBSCRIBE;
@@ -191,7 +191,7 @@ const enqueue = (sub: PubQueueNode) => {
 };
 
 /** Publishes the event to all subscribers */
-function publish<TSelf extends NotifierPubSub>(this: TSelf) {
+function publish<TSelf extends NotifierPubSubWritable>(this: TSelf) {
   if (_pubList || _pubLock) {
     /*@__NOINLINE__*/ enqueue(this);
   } else {
@@ -257,7 +257,6 @@ function unsubscribe<TSelf extends NotifierPubSubWritable>(this: TSelf, node: No
   node.prev = null;
   node.next = null;
   node.value = null;
-  --this.size;
   return true;
 }
 
@@ -277,9 +276,16 @@ function subscribe<TSelf extends NotifierPubSubWritable>(this: TSelf, handler: N
   } else {
     this.head = unsub;
   }
-  ++this.size;
 
   return unsub;
+}
+
+function shouldEmit(this: NotifierPubSub): boolean {
+  return !this.head;
+}
+
+function shouldEmit_extended(this: NotifierPubSubExtended): boolean {
+  return !this.head && this.parent.shouldEmit();
 }
 
 /**
@@ -305,11 +311,38 @@ export const notifierPubSub_new = (): NotifierPubSub => {
     handler ? notifierPubSub._sub(handler) : notifierPubSub._pub();
   notifierPubSub.head = null;
   notifierPubSub.tail = null;
-  notifierPubSub.size = 0;
   notifierPubSub._pub = publish;
   notifierPubSub._sub = subscribe;
   notifierPubSub._unsub = unsubscribe;
+  notifierPubSub.shouldEmit = shouldEmit;
   return notifierPubSub as NotifierPubSub;
+};
+
+/**
+ * Creates a new NotifierPubSub instance that extends the given NotifierPubSub instance.
+ * When the event in this NotifierPubSub is emitted, the event in the parent NotifierPubSub is also emitted.
+ *
+ * shouldEmit() is true if the parent or this notifier has subscribers.
+ *
+ * @param parent The NotifierPubSub instance to extend.
+ * @returns A new NotifierPubSub instance.
+ */
+export const notifierPubSub_extend = (parent: NotifierPubSub): NotifierPubSubExtended => {
+  const notifierPubSub = (handler?: NotifierHandler) => {
+    if (handler) {
+      return notifierPubSub._sub(handler);
+    }
+    notifierPubSub._pub();
+    return parent();
+  };
+  notifierPubSub.head = null;
+  notifierPubSub.tail = null;
+  notifierPubSub._pub = publish;
+  notifierPubSub._sub = subscribe;
+  notifierPubSub._unsub = unsubscribe;
+  notifierPubSub.shouldEmit = shouldEmit_extended;
+  notifierPubSub.parent = parent;
+  return notifierPubSub as NotifierPubSubExtended;
 };
 
 /**
@@ -343,8 +376,10 @@ export const notifierPubSub_clear = (notifier: NotifierPubSub | null | undefined
  * Returns an iterator that iterates over all nodes of a NotifierPubSub instance.
  * @param self The NotifierPubSub instance.
  */
-export function* notifierPubSub_iterate(self: NotifierPubSub | null | undefined): IterableIterator<NotifierUnsubNode> {
-  for (let node = self?.head, next; node; node = next) {
+export function* notifierPubSub_iterate(
+  notifier: NotifierPubSub | null | undefined,
+): IterableIterator<NotifierUnsubNode> {
+  for (let node = notifier?.head, next; node; node = next) {
     next = node.next;
     yield node;
   }
