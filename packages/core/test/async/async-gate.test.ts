@@ -14,8 +14,8 @@ describe("asyncGate", () => {
     expect(gate.locked).toBe(false);
     await gate();
 
-    expect(asyncGate_new(true).locked).toBe(true);
-    expect(asyncGate_new(false).locked).toBe(false);
+    expect(asyncGate_new({ locked: true }).locked).toBe(true);
+    expect(asyncGate_new({ locked: false }).locked).toBe(false);
   });
 
   it("can lock and unlock and the promise resolves only when unlocked", async () => {

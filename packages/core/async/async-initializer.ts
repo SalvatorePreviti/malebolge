@@ -1,12 +1,26 @@
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+
 import { EMPTY_OBJECT } from "../core";
 import { notifierPubSub_new, type NotifierPubSub } from "../core/notifier-pub-sub";
 
-export interface AsyncInitializerOptions {
+export interface AsyncInitializerOptions<T = unknown> {
   /**
    * The event handler to use when the value changes
    * Is useful to use the same handler for multiple observable values or to use a custom event handler.
    */
   sub?: NotifierPubSub | undefined;
+
+  /**
+   * Called when an error happens.
+   * @param error The error.
+   */
+  onError?: ((error: unknown) => void) | null | undefined;
+
+  /**
+   * Called when the promise is resolved.
+   * @param value The value.
+   */
+  onResolve?: ((value: T) => void) | null | undefined;
 }
 
 export interface AsyncInitializer<T> {
@@ -29,6 +43,19 @@ export interface AsyncInitializer<T> {
 
   /** Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function. */
   readonly sub: NotifierPubSub;
+
+  /** Returns the value of the promise when resolved. Is undefined if the promise is not yet resolved. */
+  valueOf(this: this): T | undefined;
+
+  toString(): string;
+}
+
+function valueOf<T>(this: AsyncInitializer<T>): T | undefined {
+  return this.value;
+}
+
+function toString<T>(this: AsyncInitializer<T>): string {
+  return String(this.value);
 }
 
 /**
@@ -52,9 +79,9 @@ export interface AsyncInitializer<T> {
  *
  * console.log('done');
  */
-export const asyncInitializer_new = /* @__PURE__ */ <T>(
+export const asyncInitializer_new = /*@__PURE__*/ <T>(
   fn: () => Promise<T>,
-  { sub = notifierPubSub_new() }: Readonly<AsyncInitializerOptions> = EMPTY_OBJECT,
+  { sub = notifierPubSub_new(), onResolve, onError }: Readonly<AsyncInitializerOptions<T>> = EMPTY_OBJECT,
 ): AsyncInitializer<T> => {
   let resetPending = false;
 
@@ -79,7 +106,8 @@ export const asyncInitializer_new = /* @__PURE__ */ <T>(
             initializer.resolved = true;
             initializer.value = value;
             resolve(value);
-            sub();
+            initializer.sub();
+            onResolve?.(value);
           }
         }
       };
@@ -91,14 +119,15 @@ export const asyncInitializer_new = /* @__PURE__ */ <T>(
           initializer.promise = null;
           resetPending = false;
           reject(error);
-          sub();
+          initializer.sub();
+          onError?.(error);
         }
       };
     });
 
     initializer.running = true;
     try {
-      sub();
+      initializer.sub();
       void fn().then(resolved, rejected);
     } catch (e) {
       rejected?.(e);
@@ -127,7 +156,7 @@ export const asyncInitializer_new = /* @__PURE__ */ <T>(
     initializer.resolved = false;
     initializer.promise = null;
     initializer.value = undefined;
-    sub();
+    initializer.sub();
 
     return true;
   };
@@ -138,6 +167,9 @@ export const asyncInitializer_new = /* @__PURE__ */ <T>(
   initializer.reset = reset;
   initializer.sub = sub;
   initializer.value = undefined as T | undefined;
+  initializer.valueOf = valueOf;
+  initializer.toJSON = valueOf;
+  initializer.toString = toString;
 
   return initializer;
 };

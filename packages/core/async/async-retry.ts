@@ -1,7 +1,10 @@
-import type { UnsafeAny } from "../core";
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+
 import { EMPTY_OBJECT } from "../core";
 import { isAbortError } from "./abort-error";
 import { delay } from "./delay";
+
+export type AsyncRetryResolveHandler<T = unknown> = (value: T, attempt: number, attempts: number) => void;
 
 export type AsyncRetryErrorHandler = (error: unknown, attempt: number, attempts: number) => void;
 
@@ -15,7 +18,7 @@ export const RETRY_MAX_TIMEOUT = 10000;
 
 export const RETRY_JITTER = 0.1;
 
-export interface AsyncRetryOptions {
+export interface AsyncRetryOptions<T = unknown> {
   /** Exponential backoff multiplier. Default is 2. */
   backoff?: number;
 
@@ -35,10 +38,17 @@ export interface AsyncRetryOptions {
    * Callback invoked when an attempt fails.
    * Throwing an error inside this callback will abort the retry.
    *
+   * If specified, this overrides the default handling of the AbortError, that is, throwing it breaking the retry.
+   *
    * @param error The error that caused the attempt to fail.
    * @param attempt The current attempt number.
    */
   onError?: AsyncRetryErrorHandler | null | undefined;
+
+  /**
+   * Callback invoked when the operation succeeds.
+   */
+  onResolve?: AsyncRetryResolveHandler<T> | null | undefined;
 
   /** Signal used to abort the retry */
   signal?: AbortSignal | null | undefined;
@@ -59,8 +69,9 @@ export async function asyncRetry<T>(
     maxTimeout = RETRY_MAX_TIMEOUT,
     jitter = RETRY_JITTER,
     onError = _throwIfAborted,
+    onResolve,
     signal,
-  }: Readonly<AsyncRetryOptions> = EMPTY_OBJECT,
+  }: Readonly<AsyncRetryOptions<T>> = EMPTY_OBJECT,
 ) {
   if (minTimeout > maxTimeout) {
     minTimeout = maxTimeout;
@@ -72,15 +83,10 @@ export async function asyncRetry<T>(
       throw signal.reason;
     }
     try {
-      return await fn();
+      const result = await fn();
+      onResolve?.(result, attempt, attempts);
+      return result;
     } catch (error) {
-      if (error) {
-        try {
-          (error as UnsafeAny).retry_attempt = attempt;
-          (error as UnsafeAny).retry_attempts = attempts;
-        } catch {}
-      }
-
       onError?.(error, attempt, attempts);
 
       if (attempt + 1 >= attempts) {

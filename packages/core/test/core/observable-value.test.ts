@@ -1,22 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { newObservableValue } from "../../core/observable-value";
+import { observableValue_new } from "../../core/observable-value";
 import type { UnsafeAny } from "../../core/types";
 
 describe("newObservableValue", () => {
   it("creates an observable value with the initial value", () => {
-    const value = newObservableValue(10);
+    const value = observableValue_new(10);
     expect(value()).toBe(10);
     expect(value()).toBe(10);
   });
 
   it("creates an observable value with the initial value and the given options", () => {
-    const value = newObservableValue(10, { equals: (a, b) => a === b });
+    const value = observableValue_new(10, { equals: (a, b) => a === b });
     expect(value()).toBe(10);
     expect(value()).toBe(10);
   });
 
   it("notifies the subscribers when the value changes", () => {
-    const value = newObservableValue(10);
+    const value = observableValue_new(10);
     let notified = 0;
     const unsub = value.sub(() => {
       ++notified;
@@ -40,12 +40,12 @@ describe("newObservableValue", () => {
   });
 
   it("supports toString, toJSON, valueOf", () => {
-    const objValue = newObservableValue({ x: 10 });
+    const objValue = observableValue_new({ x: 10 });
     expect(JSON.stringify(objValue)).toBe('{"x":10}');
     expect(JSON.stringify({ v: objValue })).toBe('{"v":{"x":10}}');
-    expect(newObservableValue(Symbol.for("xxx")).toString()).toBe("Symbol(xxx)");
+    expect(observableValue_new(Symbol.for("xxx")).toString()).toBe("Symbol(xxx)");
 
-    const numValue = newObservableValue(10);
+    const numValue = observableValue_new(10);
     expect(numValue.valueOf()).toBe(10);
     expect(+numValue).toBe(10);
     expect((numValue as UnsafeAny) + 10).toBe(20);

@@ -1,3 +1,5 @@
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+
 import { UNSUBSCRIBE } from "./symbols";
 import type { UnsafeAny } from "./types";
 
@@ -19,7 +21,7 @@ function _weakHandler(this: WeakRef<(payload: UnsafeAny) => UnsafeAny>, payload:
  * @param handler The handler to make weak.
  * @returns A weak handler that will be unsubscribed automatically if the original handler is garbage collected.
  */
-export const weakEventHandler = /* @__PURE__ */ <TPayload = unknown, TResult = void | UNSUBSCRIBE>(
+export const weakEventHandler = /*@__PURE__*/ <TPayload = unknown, TResult = void | UNSUBSCRIBE>(
   handler: (payload: TPayload) => TResult,
 ): ((value: TPayload) => TResult | UNSUBSCRIBE) => {
   let weakHandler = (handler as UnsafeAny)[_WEAK_HANDLER];

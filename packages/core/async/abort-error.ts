@@ -1,3 +1,5 @@
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+
 import { EMPTY_OBJECT, setFunctionName } from "../core";
 
 /** Returns true if the given value is an AbortError. */
@@ -46,14 +48,14 @@ function _AbortError(
   return result;
 }
 
-_AbortError.prototype = /* @__PURE__ */ DOMException.prototype;
+_AbortError.prototype = /*@__PURE__*/ DOMException.prototype;
 
-/* @__PURE__ */ Object.defineProperty(_AbortError, Symbol.hasInstance, {
+/*@__PURE__*/ Object.defineProperty(_AbortError, Symbol.hasInstance, {
   value: isAbortError,
   configurable: true,
   writable: true,
 });
 
-/* @__PURE__ */ setFunctionName(_AbortError, "AbortError");
+/*@__PURE__*/ setFunctionName(_AbortError, "AbortError");
 
-export const AbortError = /* @__PURE__ */ _AbortError as unknown as AbortErrorConstructor;
+export const AbortError = /*@__PURE__*/ _AbortError as unknown as AbortErrorConstructor;

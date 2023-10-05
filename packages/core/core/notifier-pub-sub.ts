@@ -1,17 +1,26 @@
-import { linkedList_includesValue, linkedList_isEmpty, linkedList_size } from "../data-structures";
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+
+import { fnUndefined } from "./fns";
 import { UNSUBSCRIBE } from "./symbols";
 
-export type NotifierHandler = (sender?: NotifierEmitFn) => void | UNSUBSCRIBE | unknown;
+/** The type of a function that can be used as subscriber in a NotifierPubSub instance. */
+export type NotifierHandler = (sender?: NotifierPubSub) => void | UNSUBSCRIBE | unknown;
 
-export type NotifierEmitFn = () => void;
+/** The type of the publish function for a NotifierPubSub */
+export type NotifierPubFn = () => void;
 
-export type NotifierEmit = NotifierEmitFn;
-
+/**
+ * The type of the unsubscribe function returned by NotifierSubFn
+ * @returns True if the handler was unsubscribed, false if it was already unsubscribed.
+ */
 export type NotifierUnsubFn = () => boolean;
 
+/** The type of the subscribe function for a NotifierPubSub */
 export type NotifierSubFn = (handler: NotifierHandler) => NotifierUnsubFn;
 
-export interface NotifierUnsub extends NotifierUnsubFn {
+export type NotifierPubSubFn = NotifierPubFn & NotifierSubFn;
+
+export interface NotifierUnsubNode extends NotifierUnsubFn {
   /** The function to be invoked when the event is emitted. Is null if the handler was unsubscribed. */
   readonly value: NotifierHandler | null;
 
@@ -22,308 +31,326 @@ export interface NotifierUnsub extends NotifierUnsubFn {
   readonly next: this | null;
 }
 
-export interface NotifierSub extends NotifierSubFn {
-  (handler: NotifierHandler): NotifierUnsub;
+export interface NotifierPubSub extends NotifierPubSubFn {
+  /**
+   * Register a subscriber
+   * @param handler The handler to be invoked when the event is emitted.
+   * @returns A function to unsubscribe the handler.
+   */
+  (handler: NotifierHandler): NotifierUnsubNode;
 
-  /** The first ubsubscriber in the linked list of subscribers, or null if empty */
-  readonly head: NotifierUnsub | null;
-
-  /** The last ubsubscriber in the linked list of subscribers, or null if empty */
-  readonly tail: NotifierUnsub | null;
-}
-
-export interface NotifierPubSub extends NotifierSub, NotifierEmitFn {
-  /** Register a new subscriber. */
-  (handler: NotifierHandler): NotifierUnsub;
-
-  /** Emit the event to all subscribers. */
+  /** Emit the notification to all subscribers */
   (): void;
+
+  /** The first subscriber in the linked list, or null if empty. */
+  readonly head: NotifierUnsubNode | null;
+
+  /** The last subscriber in the linked list, or null if empty. */
+  readonly tail: NotifierUnsubNode | null;
+
+  /** The number of subscribers. */
+  readonly size: number;
+
+  /**
+   * Emit the event to all subscribers.
+   * This method is used internally by NotifierPubSub instances, and is exposed for extensibility.
+   * Should not be called directly in a NotifierPubSub, you should just call notifier();
+   */
+  _pub(this: this): void;
+
+  /**
+   * Subscribe the given handler, creating a new node and inserting it in the linked list.
+   * This method is used internally by NotifierPubSub instances, and is exposed for extensibility.
+   * Should not be called directly in a NotifierPubSub
+   */
+  _sub(this: this, handler: NotifierHandler): NotifierUnsubNode;
+
+  /**
+   * Unsubscribes the given node.
+   * This method is used internally by NotifierPubSub instances, and is exposed for extensibility.
+   * Should not be called directly in a NotifierPubSub
+   */
+  _unsub(this: this, node: NotifierUnsubNode): boolean;
 }
 
-const _UNSUBSCRIBE = UNSUBSCRIBE;
-const _EMIT_QUEUE_NEXT = Symbol("emitQueueNext");
-
-interface NotifierUnsubNode extends NotifierUnsub {
+interface NotifierUnsubWritableNode extends NotifierUnsubNode {
+  /** The function to be invoked when the event is emitted. Is null if the handler was unsubscribed. */
   value: NotifierHandler | null;
+
+  /** The previous node in the linked list */
   prev: this | null;
+
+  /** The next node in the linked list */
   next: this | null;
 }
 
-interface Notifier extends NotifierPubSub {
-  head: NotifierUnsubNode | null;
-  tail: NotifierUnsubNode | null;
-  [_EMIT_QUEUE_NEXT]: EmitQueueNode | false | null;
+interface NotifierPubSubWritable extends NotifierPubSub {
+  /** The first NotifierPubSub instance in the linked list, or null if empty */
+  head: NotifierUnsubWritableNode | null;
+
+  /** The last NotifierPubSub instance in the linked list, or null if empty */
+  tail: NotifierUnsubWritableNode | null;
+
+  size: number;
 }
 
-interface EmitQueueNode extends NotifierEmitFn {
-  [_EMIT_QUEUE_NEXT]: EmitQueueNode | false | null;
+const _UNSUBSCRIBE = UNSUBSCRIBE;
+const _EMIT_NEXT = Symbol("emitNext");
+const _EMITTER = Symbol("emitter");
+
+interface PubQueueNode extends NotifierPubSubWritable {
+  [_EMIT_NEXT]?: PubQueueNode | false | null;
+  _pub(): void;
 }
 
-let _iter: NotifierUnsub | null = null;
-let _iterSub: NotifierSub | null = null;
-let _iterHandler: NotifierHandler | null | undefined;
-let _emitHead: EmitQueueNode | null = null;
-let _emitTail: EmitQueueNode | null = null;
-let _emitFlushing = false;
-let _emitLock = 0;
+/** The current notifier being iterated during a publish */
+let _pubList: NotifierPubSub | null = null;
 
-const _emitFlush = () => {
-  if (_emitFlushing) {
+/** The current node being iterated during a publish */
+let _pubIter: NotifierUnsubNode | null = null;
+
+/** The previous handler being iterated during a publish */
+let _pubValue: NotifierHandler | null | undefined;
+
+/** The head of the publisher enqueued for later processing */
+let _pubHead: PubQueueNode | null = null;
+
+/** The tail of the publisher enqueued for later processing */
+let _pubTail: PubQueueNode | null = null;
+
+/** True while flushing the pub queue */
+let _pubFlush = false;
+
+/** A counter that keep track if publish is temporarily delayed until unlocked */
+let _pubLock = 0;
+
+/** Flushes tue pub queue */
+const flush = (): void => {
+  if (_pubFlush) {
     return; // Another flushing already in progress
   }
-  _emitFlushing = true;
+  _pubFlush = true;
   try {
     for (;;) {
-      const emit = _emitHead;
-      if (!emit || _emitLock) {
+      const node = _pubHead;
+      if (!node || _pubLock) {
         break; // Iteration terminated or emit is locked
       }
-      const next = emit[_EMIT_QUEUE_NEXT];
-      emit[_EMIT_QUEUE_NEXT] = null;
+      const next = node[_EMIT_NEXT];
+      node[_EMIT_NEXT] = null;
       if (!next) {
-        _emitTail = null;
-        _emitHead = null;
+        _pubTail = null;
+        _pubHead = null;
       } else {
-        _emitHead = next;
+        _pubHead = next;
       }
-      emit();
+      node._pub();
     }
   } finally {
-    _emitFlushing = false;
+    _pubFlush = false;
   }
 };
 
-const _emitEnqueue = (sub: Notifier) => {
-  if (_iterSub === sub) {
+/** Enqueues the given subscriber for later processing */
+const enqueue = (sub: PubQueueNode) => {
+  if (_pubList === sub) {
     // We are already emitting this subscriber, we need to reset the iteration to the beginning.
-    _iterHandler = null;
-    _iter = sub.head;
+    _pubValue = null;
+    _pubIter = sub.head;
   } else if (sub.head) {
     // Another emit is in progress and this subscriber is not empty, we need to enqueue this emit.
-    const next = sub[_EMIT_QUEUE_NEXT];
+    const next = sub[_EMIT_NEXT];
     if (!next && next !== false) {
-      sub[_EMIT_QUEUE_NEXT] = false;
-      if (_emitTail) {
-        _emitTail[_EMIT_QUEUE_NEXT] = sub;
+      sub[_EMIT_NEXT] = false;
+      if (_pubTail) {
+        _pubTail[_EMIT_NEXT] = sub;
       } else {
-        _emitHead = sub;
+        _pubHead = sub;
       }
-      _emitTail = sub;
+      _pubTail = sub;
     }
   }
 };
 
-const _subscribe = (sub: Notifier, handler: NotifierHandler) => {
-  const unsub = (): boolean => {
-    const { value, prev, next } = unsub;
+/** Publishes the event to all subscribers */
+function publish<TSelf extends NotifierPubSub>(this: TSelf) {
+  if (_pubList || _pubLock) {
+    /*@__NOINLINE__*/ enqueue(this);
+  } else {
+    _pubIter = this.head;
+    if (_pubIter) {
+      _pubList = this;
+      try {
+        do {
+          const iter: NotifierUnsubNode = _pubIter;
+          const value = iter.value;
+          if (!value) {
+            // Edge case: a node that is after the current node was deleted inside an handler while iterating.
+            // We need to restart from the beginning to ensure all handlers are notified.
+            _pubIter = this.head;
+          } else {
+            _pubIter = iter.next; // Advance the iterator
 
-    if (!value) {
-      return false; // Already unsubscribed
+            // We avoid emitting if the previous handler was the same, a small optimization
+            // if the same handler was registered multiple times one after the other.
+            if (value !== _pubValue) {
+              _pubValue = value;
+
+              // Invoke the listener.
+              if (value(this) === _UNSUBSCRIBE) {
+                iter(); // Remove the node
+              }
+            }
+          }
+        } while (_pubIter);
+      } finally {
+        _pubList = null;
+        _pubIter = null;
+        _pubValue = null;
+      }
     }
 
-    // Remove from the linked list
-
-    if (prev) {
-      prev.next = next;
-    } else {
-      sub.head = next;
+    if (_pubHead) {
+      /*@__NOINLINE__*/ flush();
     }
-    if (next) {
-      next.prev = prev;
-    } else {
-      sub.tail = prev;
-    }
-    unsub.prev = null;
-    unsub.next = null;
-    unsub.value = null;
+  }
 
-    if (_iter === unsub) {
-      _iter = next; // We are currently iterating this subscriber, we need to advance the iterator.
-    }
+  return undefined;
+}
 
-    return true;
-  };
+/** Unsubscribes the given node */
+function unsubscribe<TSelf extends NotifierPubSubWritable>(this: TSelf, node: NotifierUnsubWritableNode): boolean {
+  const { value, prev, next } = node;
+  if (!value) {
+    return false; // Already unsubscribed
+  }
 
-  const tail = sub.tail;
+  // Remove from the linked list
+  if (prev) {
+    prev.next = next;
+  } else {
+    this.head = next;
+  }
+  if (next) {
+    next.prev = prev;
+  } else {
+    this.tail = prev;
+  }
+  node.prev = null;
+  node.next = null;
+  node.value = null;
+  --this.size;
+  return true;
+}
+
+/** Subscribes the given handler, creating a new node and inserting it in the linked list */
+function subscribe<TSelf extends NotifierPubSubWritable>(this: TSelf, handler: NotifierHandler): NotifierUnsubNode {
+  const unsub = (): boolean => this._unsub(unsub);
+
+  const tail = this.tail;
 
   unsub.prev = tail;
   unsub.next = null as typeof unsub.prev;
   unsub.value = handler as NotifierHandler | null;
 
-  sub.tail = unsub;
+  this.tail = unsub;
   if (tail) {
     tail.next = unsub;
   } else {
-    sub.head = unsub;
+    this.head = unsub;
   }
+  ++this.size;
 
   return unsub;
-};
+}
 
 /**
  * Creates a new NotifierPubSub instance.
- *
- * Simple event is a function that accepts a subscriber.
- * The subscriber is a function that will be called when the event is emitted.
- * The subscriber can return the special symbol UNSUBSCRIBE to automatically unsubscribe after invoked.
- *
- * This implementation is optimized and was benchmarked for speed and memory, it uses a linked list internally so that subscription and unsubscription are O(1).
- * The order of emits is preserved, the order of handlers is preserved, the order of unsubscription is preserved.
- *
- * This function tries to not emit the same handler twice in a row, but it is not guaranteed.
- *
- * If another emit happens during an emit, the second emit will be queued and executed after the first emit is finished,
- * this ensures that the order of emits is predictable also in recursive and stacked scenarios.
- *
- * @see NotifierPubSub
- * @see UNSUBSCRIBE
- *
- * This code is based on https://github.com/SalvatorePreviti/malebolge - MIT license
- *
  * @returns A new NotifierPubSub instance.
+ *
+ * @example
+ *
+ * const notifier = notifierPubSub_new();
+ *
+ * const unsubscribe = notifier(()=>{
+ *  console.log("Hello world!");
+ * });
+ *
+ * notifier(); // Prints "Hello world!"
+ *
+ * unsubscribe();
+ *
+ * notifier(); // Nothing happens
  */
-export const notifierPubSub_new = /* @__PURE__ */ (): NotifierPubSub => {
-  const sub = ((handler?: NotifierHandler) => {
-    if (handler) {
-      // Add to the linked list.
-      return _subscribe(sub, handler);
-    }
-
-    // Emit the event
-
-    if (_iterSub || _emitLock) {
-      return _emitEnqueue(sub);
-    }
-
-    _iter = sub.head;
-    if (_iter) {
-      _iterSub = sub;
-      try {
-        do {
-          const iter: NotifierUnsubNode = _iter;
-          const value = iter.value;
-          if (!value) {
-            // Edge case: a node that is after the current node was deleted inside an handler while iterating.
-            // We need to restart from the beginning to ensure all handlers are notified.
-            _iter = sub.head;
-          } else {
-            _iter = iter.next; // Advance the iterator
-
-            // We avoid emitting if the previous handler was the same, a small optimization
-            // if the same handler was registered multiple times.
-            if (value !== _iterHandler) {
-              _iterHandler = value;
-
-              // Invoke the listener.
-              if (value(sub) === _UNSUBSCRIBE) {
-                iter(); // Remove the node
-              }
-            }
-          }
-        } while (_iter);
-      } finally {
-        _iterSub = null;
-        _iter = null;
-        _iterHandler = null;
-      }
-    }
-
-    if (_emitHead) {
-      _emitFlush();
-    }
-
-    return undefined;
-  }) as Notifier;
-
-  sub.head = null;
-  sub.tail = null;
-  sub[_EMIT_QUEUE_NEXT] = null;
-
-  return sub;
+export const notifierPubSub_new = (): NotifierPubSub => {
+  const notifier = (handler?: NotifierHandler) => (handler ? notifier._sub(handler) : notifier._pub());
+  notifier.head = null;
+  notifier.tail = null;
+  notifier.size = 0;
+  notifier._pub = publish;
+  notifier._sub = subscribe;
+  notifier._unsub = unsubscribe;
+  return notifier as NotifierPubSub;
 };
 
 /**
- * In case of exception the queue of emits might not be flushed, this function flushes the queue.
- * Normally you don't need to call this function, but if for some reason an exception is thrown and not catched this function can be used to flush the queue.
+ * Gets a ()=>void function that invokes an emit on the given NotifierPubSub instance.
+ * This is needed sometimes when you need an emit that does not have any parameter.
+ * We do not create an additional emit() property to reduce the memory footprint.
+ *
+ * The function is cached.
+ *
+ * @param notifier The NotifierPubSub instance. If null or undefined or false, returns a function that does nothing.
+ * @returns A function that invokes an emit on the given NotifierPubSub instance.
+ * If notifier is null or undefined or false, returns a function that does nothing.
  */
-export const notifierPubSub_flush = (): boolean => {
-  if (!_emitHead) {
-    return false;
+export const notifierPubSub_emitter = (notifier: NotifierPubSubFn | null | undefined | false): (() => void) =>
+  (notifier as { [_EMITTER]?: () => void })?.[_EMITTER] ||
+  (notifier ? ((notifier as { [_EMITTER]?: () => void })[_EMITTER] = () => notifier()) : fnUndefined);
+
+/**
+ * Removes all subscribers from a NotifierPubSub instance.
+ * @param notifier
+ * @returns
+ */
+export const notifierPubSub_clear = (notifier: NotifierPubSub | null | undefined): boolean => {
+  for (let node = notifier?.head, next; node; node = next) {
+    next = node.next;
+    node();
   }
-  _emitFlush();
   return true;
 };
 
 /**
- * Clears all subscribers from a NotifierPubSub instance.
- *
- * @param sub The NotifierPubSub instance.
+ * Returns an iterator that iterates over all nodes of a NotifierPubSub instance.
+ * @param self The NotifierPubSub instance.
  */
-export const notifierPubSub_clear = (sub: NotifierSub): void => {
-  for (let node = sub.head as NotifierUnsubNode | null, next: NotifierUnsubNode | null; node; node = next) {
+export function* notifierPubSub_iterate(self: NotifierPubSub | null | undefined): IterableIterator<NotifierUnsubNode> {
+  for (let node = self?.head, next; node; node = next) {
     next = node.next;
-    if (node === _iter) {
-      _iter = null;
-      _iterHandler = null;
-    }
-    node.value = null;
-    node.prev = null;
-    node.next = null;
+    yield node;
   }
-  (sub as { head: null }).head = null;
-  (sub as { tail: null }).tail = null;
+}
+
+/**
+ * Checks if the given handler is subscribed.
+ * Complexity is O(n).
+ *
+ * @param notifier The NotifierPubSub instance.
+ * @param handler The handler to check, or, the unsubscribe function to check.
+ * @returns
+ */
+export const notifierPubSub_includes = (
+  notifier: NotifierPubSub | null | undefined,
+  handler: NotifierHandler | NotifierUnsubFn,
+): boolean => {
+  for (let node = notifier?.head; node; node = node.next) {
+    if (node === handler || node.value === handler) {
+      return true;
+    }
+  }
+  return false;
 };
-
-/**
- * Returns true if the NotifierPubSub instance is empty.
- * Complexity is O(1).
- *
- * @param sub The NotifierPubSub instance.
- * @returns True if the NotifierPubSub instance is empty.
- */
-export const notifierPubSub_isEmpty: (sub: NotifierSub | null | undefined) => boolean = linkedList_isEmpty;
-
-/**
- * Returns the number of subscribers of a NotifierPubSub instance.
- * This function is useful only during tests. To see if a pub sub is empty just check for the head property that is not null
- * Complexity is O(n).
- *
- * @see notifierPubSub_isEmpty
- *
- * @param sub The NotifierPubSub instance.
- * @returns The number of subscribers.
- */
-export const notifierPubSub_size: (sub: NotifierSub | null | undefined) => number = linkedList_size;
-
-/**
- * Returns true if the given handler is subscribed.
- * Complexity is O(n).
- *
- * @param sub The NotifierPubSub instance.
- * @param value The handler to check, or, the unsubscribe function to check.
- * @returns True if the given handler is subscribed.
- */
-export const notifierPubSub_includes: (sub: NotifierSub | null | undefined, handler: NotifierHandler) => boolean =
-  linkedList_includesValue;
-
-/**
- * Returns true if an emit is in progress or is locked.
- * The lock is global and shared between all NotifierPubSub instances.
- *
- * @returns True if an emit is in progress.
- *
- * @see notifierPubSub_lock
- * @see notifierPubSub_batch
- */
-export const notifierPubSub_isLocked = (): boolean => _emitLock > 0;
-
-/**
- * Returns true if an emit is in progress.
- * If no sub is passed it returns true if any emit is in progress.
- * @param sub The NotifierPubSub instance to check.
- * @returns True if an emit is in progress.
- */
-export const notifierPubSub_isEmitting = (sub?: NotifierSub): boolean => (sub ? _iterSub === sub : !!_iterSub);
 
 /**
  * Batch emits, they will be executed after the returned dispose function is called.
@@ -340,13 +367,13 @@ export const notifierPubSub_lock = (): (() => boolean) => {
       return false;
     }
     unlock = null!;
-    --_emitLock;
-    if (_emitHead) {
-      _emitFlush();
+    --_pubLock;
+    if (_pubHead) {
+      /*@__NOINLINE__*/ flush();
     }
     return true;
   };
-  ++_emitLock;
+  ++_pubLock;
   return unlock;
 };
 
@@ -360,14 +387,34 @@ export const notifierPubSub_lock = (): (() => boolean) => {
  */
 export const notifierPubSub_batch = <R = void>(fn: () => R): R => {
   let result: R;
-  ++_emitLock;
+  ++_pubLock;
   try {
     result = fn();
   } finally {
-    --_emitLock;
+    --_pubLock;
   }
-  if (_emitHead) {
-    _emitFlush();
+  if (_pubHead) {
+    /*@__NOINLINE__*/ flush();
   }
   return result;
 };
+
+/**
+ * Returns true if an emit is in progress.
+ * If no sub is passed it returns true if any emit is in progress.
+ * @param sub The NotifierPubSub instance to check.
+ * @returns True if an emit is in progress.
+ */
+export const notifierPubSub_isEmitting = (sub?: NotifierPubSub): boolean =>
+  !!_pubList && (sub === undefined || _pubList === sub);
+
+/**
+ * Returns true if an emit is in progress or is locked.
+ * The lock is global and shared between all NotifierPubSub instances.
+ *
+ * @returns True if an emit is in progress.
+ *
+ * @see notifierPubSub_lock
+ * @see notifierPubSub_batch
+ */
+export const notifierPubSub_isLocked = (): boolean => _pubLock !== 0;

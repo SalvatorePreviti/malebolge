@@ -1,3 +1,5 @@
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+
 import { EMPTY_OBJECT } from "../core";
 import { notifierPubSub_new, type NotifierPubSub } from "../core/notifier-pub-sub";
 
@@ -7,6 +9,9 @@ export interface AsyncStampedeOptions {
    * Is useful to use the same handler for multiple observable values or to use a custom event handler.
    */
   sub?: NotifierPubSub | undefined;
+
+  /** AbortSignal. If the signal is aborted subsequent calls to this function will fail. */
+  signal?: AbortSignal | null | undefined;
 }
 
 export interface AsyncStampede<T> {
@@ -15,10 +20,8 @@ export interface AsyncStampede<T> {
   /** The current promise. Is null if is not running, is not null while is running. */
   readonly promise: Promise<T> | null;
 
-  /**
-   * Attaches an handler that gets notified every time the state changes. It returns an unsubscribe function.
-   */
-  readonly sub: NotifierPubSub;
+  /** Notification pub-sub when something changes. */
+  sub: NotifierPubSub;
 }
 
 /**
@@ -46,50 +49,73 @@ export interface AsyncStampede<T> {
  *
  * console.log(counter); // 1
  */
-export const asyncStampede_new = /* @__PURE__ */ <T>(
+export const asyncStampede_new = /*@__PURE__*/ <T>(
   fn: () => Promise<T>,
-  { sub = notifierPubSub_new() }: Readonly<AsyncStampedeOptions> = EMPTY_OBJECT,
+  options: Readonly<AsyncStampedeOptions> = EMPTY_OBJECT,
 ): AsyncStampede<T> => {
+  let _resolve: ((value: T) => void) | undefined | null;
+  let _reject: ((error: unknown) => void) | undefined | null;
+  let resolved: (value: T) => void;
+  let rejected: (error: unknown) => void;
+
+  let abortSignalRegistered = false;
+  const abortSignal = options.signal;
+
+  const promiseInit = (resolve: (value: T) => void, reject: (error: unknown) => void) => {
+    _reject = reject;
+    if (abortSignal) {
+      abortSignal.throwIfAborted();
+      if (!abortSignalRegistered) {
+        abortSignalRegistered = true;
+        abortSignal.addEventListener("abort", () => rejected(abortSignal.reason), { once: true });
+      }
+    }
+    _resolve = resolve;
+  };
+
   const stampede = (): Promise<T> => {
-    if (stampede.promise) {
-      return stampede.promise;
+    if (!stampede.promise) {
+      stampede.promise = new Promise<T>(promiseInit);
+      try {
+        stampede.sub();
+        void fn().then(resolved, rejected);
+      } catch (e) {
+        rejected?.(e);
+      }
     }
-
-    let resolved: ((value: T) => void) | undefined;
-    let rejected: ((error: unknown) => void) | undefined;
-    stampede.promise = new Promise<T>((resolve, reject) => {
-      resolved = (value: T) => {
-        if (resolved) {
-          stampede.promise = null;
-          resolved = undefined;
-          rejected = undefined;
-          resolve(value);
-          sub();
-        }
-      };
-      rejected = (error: unknown) => {
-        if (rejected) {
-          stampede.promise = null;
-          resolved = undefined;
-          rejected = undefined;
-          reject(error);
-          sub();
-        }
-      };
-    });
-
-    try {
-      sub();
-      void fn().then(resolved, rejected);
-    } catch (e) {
-      rejected?.(e);
-    }
-
     return stampede.promise;
   };
 
+  resolved = (value: T) => {
+    if (stampede.promise) {
+      stampede.promise = null;
+      try {
+        stampede.sub();
+      } catch (error) {
+        _reject?.(error);
+        try {
+          stampede.sub();
+        } catch {}
+        return;
+      }
+      _resolve?.(value);
+      _reject = null;
+      _resolve = null;
+    }
+  };
+
+  rejected = (error: unknown) => {
+    if (stampede.promise) {
+      stampede.promise = null;
+      _reject?.(error);
+      _reject = null;
+      _resolve = null;
+      stampede.sub();
+    }
+  };
+
   stampede.promise = null as Promise<T> | null;
-  stampede.sub = sub;
+  stampede.sub = options.sub || notifierPubSub_new();
 
   return stampede;
 };

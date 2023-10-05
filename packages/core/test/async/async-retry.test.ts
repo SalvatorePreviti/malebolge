@@ -46,7 +46,7 @@ describe("asyncRetry", () => {
     await expect(
       asyncRetry(() => Promise.reject(new Error(`failed${failCount++}`)), {
         attempts: 3,
-        onError,
+        onCatch: onError,
         minTimeout: 1,
         maxTimeout: 9,
       }),

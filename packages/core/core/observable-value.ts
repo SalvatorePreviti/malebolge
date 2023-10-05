@@ -1,5 +1,8 @@
-import { type NotifierSubFn, type NotifierSub, type NotifierPubSub, notifierPubSub_new } from "./notifier-pub-sub";
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+
 import { fnEquals } from "./fns";
+import { notifierPubSub_new } from "./notifier-pub-sub";
+import type { NotifierPubSub, NotifierSubFn } from "./notifier-pub-sub";
 import { EMPTY_OBJECT } from "./objects";
 import { UNSET } from "./symbols";
 import type { UnsafeAny } from "./types";
@@ -9,11 +12,11 @@ import type { UnsafeAny } from "./types";
  *
  * The function has a property `sub` that is a function that accepts a handler that will be called when the value changes.
  *
- * @see newObservableValue
- * @see newLazyObservableValue
- * @see newDerivedObservableValue
- * @see newGetterObservableValue
- * @see newGetterSetterObservableValue
+ * @see observableValue_new
+ * @see lazyObservableValue_new
+ * @see derivedObservableValue_new
+ * @see getterObservableValue_new
+ * @see getterSetterObservableValue_new
  */
 export interface ReadonlyObservableValue<T = unknown> {
   /** Gets the current value */
@@ -23,17 +26,18 @@ export interface ReadonlyObservableValue<T = unknown> {
   valueOf(): T;
 
   /**
-   * Subscribe to changes in the value.
-   * @param handler A function that will be called when the value changes.
-   * @returns A function that can be called to unsubscribe the handler.
+   * Notification event handler.
+   *
+   * This property may be overridden by a custom store.
+   * This is useful especially in react to implement SSR or during tests.
    */
-  readonly sub: NotifierSub;
+  readonly sub: NotifierPubSub;
 
   /**
    * This is an internal property used to attach an observable value to a custom store.
    * This is useful especially in react to implement SSR or during tests.
    *
-   * Do not use directly in the application logic as it can change in the future, is internal.
+   * Do not use directly in the application logic.
    *
    */
   readonly _stored?: T | UNSET | undefined;
@@ -52,9 +56,9 @@ export interface ReadonlyObservableValue<T = unknown> {
  * If the value is an object, it is recommended to use the spread operator to create a new object.
  * This will ensure that the value is changed and subscribers are notified.
  *
- * @see newObservableValue
- * @see newLazyObservableValue
- * @see newGetterSetterObservableValue
+ * @see observableValue_new
+ * @see lazyObservableValue_new
+ * @see getterSetterObservableValue_new
  */
 export interface ObservableValue<T = unknown, TSet extends T = T> extends ReadonlyObservableValue<T> {
   /**
@@ -65,42 +69,7 @@ export interface ObservableValue<T = unknown, TSet extends T = T> extends Readon
    * If the value is an object, it is recommended to use the spread operator to create a new object.
    * This will ensure that the value is changed and subscribers are notified.
    *
-   * @see newObservableValue
-   * @see sub
-   * @see ObservableValue
-   *
-   * @param value The new value.
-   */
-  set: (value: TSet) => void;
-}
-
-/**
- * An observable value is a function that returns the current value.
- *
- * The function has a property `sub` that is a function that accepts a handler that will be called when the value changes.
- *
- * The function has a property `set` that accepts a value or UNSET
- * If the value was changed, all subscribers will be notified.
- * If the value was not changed, no subscribers will be notified.
- *
- * By default this function uses reference equality to determine if the value was changed (===).
- * If the value is an object, it is recommended to use the spread operator to create a new object.
- * This will ensure that the value is changed and subscribers are notified.
- *
- * @see newObservableValue
- * @see newLazyObservableValue
- * @see newGetterSetterObservableValue
- */
-export interface ResettableObservableValue<T = unknown, TSet extends T = T> extends ObservableValue<T, TSet> {
-  /**
-   * Reset the current value of the state to the initial value.
-   * If the value was changed, all subscribers will be notified.
-   * If the value was not changed, no subscribers will be notified.
-   * This function uses reference equality to determine if the value was changed (===).
-   * If the value is an object, it is recommended to use the spread operator to create a new object.
-   * This will ensure that the value is changed and subscribers are notified.
-   *
-   * @see newObservableValue
+   * @see observableValue_new
    * @see sub
    * @see ObservableValue
    *
@@ -115,7 +84,7 @@ export interface ResettableObservableValue<T = unknown, TSet extends T = T> exte
  * The function has a property `sub` that is a function that accepts a handler that will be called when the value changes.
  * The function has a property `update` that forces a recomputation of the derived value.
  *
- * @see newDerivedObservableValue
+ * @see derivedObservableValue_new
  */
 export interface DerivedObservableValue<T = unknown> extends ReadonlyObservableValue<T> {
   /**
@@ -131,8 +100,7 @@ function valueOf<T>(this: () => T): T {
 }
 
 function toString<T>(this: () => T): string {
-  const value = this();
-  return typeof value === "symbol" ? value.toString() : `${value}`;
+  return String(this());
 }
 
 /**
@@ -169,10 +137,10 @@ export interface ObservableValueOptions<T = unknown> {
  * @see ObservableValue
  * @returns A new ObservableValue instance.
  */
-export const newObservableValue = /* @__PURE__ */ <T>(
+export const observableValue_new = /*@__PURE__*/ <T>(
   initial: T,
   { equals = fnEquals, sub = notifierPubSub_new() }: ObservableValueOptions<T> = EMPTY_OBJECT,
-): ResettableObservableValue<T> => {
+): ObservableValue<T> => {
   const get = (): T => {
     const current = get._stored;
     if (current === UNSET) {
@@ -192,7 +160,7 @@ export const newObservableValue = /* @__PURE__ */ <T>(
       }
       if (!equals(current, value)) {
         get._stored = value;
-        sub.emit();
+        sub();
       }
     }
   };
@@ -207,7 +175,7 @@ export const newObservableValue = /* @__PURE__ */ <T>(
   return get;
 };
 
-export const newLazyObservableValue = /* @__PURE__ */ <T>(
+export const lazyObservableValue_new = /*@__PURE__*/ <T>(
   /**
    * The function to initialize the observable value.
    *
@@ -219,7 +187,7 @@ export const newLazyObservableValue = /* @__PURE__ */ <T>(
    */
   initializer: (observableValue: ReadonlyObservableValue<T>, counter: number) => T,
   { equals = fnEquals, sub = notifierPubSub_new() }: ObservableValueOptions<T> = EMPTY_OBJECT,
-): ResettableObservableValue<T> => {
+): ObservableValue<T> => {
   const get = (): T => {
     let current = get._stored;
     if (current === UNSET) {
@@ -254,7 +222,7 @@ export const newLazyObservableValue = /* @__PURE__ */ <T>(
       }
       if (!equals(current, value)) {
         get._stored = value;
-        sub.emit();
+        sub();
       }
     }
   };
@@ -270,7 +238,7 @@ export const newLazyObservableValue = /* @__PURE__ */ <T>(
   return get;
 };
 
-export const newDerivedObservableValue = <T>(
+export const derivedObservableValue_new = <T>(
   /**
    * The function to derive the value.
    *
@@ -305,7 +273,7 @@ export const newDerivedObservableValue = <T>(
     const value = get._getter(current, get);
     if (!equals(current, value)) {
       get._stored = value;
-      sub.emit();
+      sub();
     }
     return value;
   };
@@ -333,7 +301,7 @@ export const newDerivedObservableValue = <T>(
   return get;
 };
 
-export const newGetterObservableValue = /* @__PURE__ */ <T>(
+export const getterObservableValue_new = /*@__PURE__*/ <T>(
   getter: (this: ReadonlyObservableValue<T>, oldValue: T | undefined, observableValue: ReadonlyObservableValue<T>) => T,
   { equals = fnEquals, sub = notifierPubSub_new() }: ObservableValueOptions<T> = EMPTY_OBJECT,
 ): ReadonlyObservableValue<T> => {
@@ -347,7 +315,7 @@ export const newGetterObservableValue = /* @__PURE__ */ <T>(
       value = get._getter(stored, get);
       if (!equals(stored, value)) {
         get._stored = value;
-        sub.emit();
+        sub();
       }
     }
     return value;
@@ -363,7 +331,7 @@ export const newGetterObservableValue = /* @__PURE__ */ <T>(
   return get;
 };
 
-export const newGetterSetterObservableValue = /* @__PURE__ */ <T, TSet extends T = T>(
+export const getterSetterObservableValue_new = /*@__PURE__*/ <T, TSet extends T = T>(
   getter: (
     this: ObservableValue<T>,
     oldValue: T | undefined,
@@ -373,7 +341,7 @@ export const newGetterSetterObservableValue = /* @__PURE__ */ <T, TSet extends T
   setter: (this: ObservableValue<T>, value: TSet) => void,
   options: ObservableValueOptions = EMPTY_OBJECT,
 ): ObservableValue<T, TSet> => {
-  const get = newGetterObservableValue<T>(getter as UnsafeAny, options) as ReadonlyObservableValue<T> & {
+  const get = getterObservableValue_new<T>(getter as UnsafeAny, options) as ReadonlyObservableValue<T> & {
     set: (value: TSet) => void;
     _setter: (value: TSet) => void;
   };

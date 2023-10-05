@@ -1,22 +1,22 @@
 import type { UnsafeAny } from "./types";
 
-const { isArray } = /* @__PURE__ */ Array;
+const { isArray } = /*@__PURE__*/ Array;
 
 const {
   getPrototypeOf,
   getOwnPropertyDescriptor,
   hasOwn,
   keys: objectKeys,
-} = /* @__PURE__ */ Object as typeof Object & {
+} = /*@__PURE__*/ Object as typeof Object & {
   hasOwn?(o: object, v: PropertyKey): boolean;
 };
 
-const { defineProperty } = /* @__PURE__ */ Reflect;
+const { defineProperty } = /*@__PURE__*/ Reflect;
 
 /**
  * A frozen empty object that can be used as a default value for function parameters.
  */
-export const EMPTY_OBJECT = /* @__PURE__ */ Object.freeze({}) as {};
+export const EMPTY_OBJECT = /*@__PURE__*/ Object.freeze({}) as {};
 
 /**
  * Gets the name of the given function
@@ -64,7 +64,7 @@ export const getClassName = (obj: unknown): string | undefined => {
  * Cross browser implementation of Object.hasOwn
  * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwn
  */
-export const object_hasOwn: /* @__PURE__ */ (obj: unknown, key: PropertyKey) => boolean = (() => {
+export const object_hasOwn: /*@__PURE__*/ (obj: unknown, key: PropertyKey) => boolean = (() => {
   if (hasOwn) {
     return (obj: unknown, key: PropertyKey) => obj !== null && obj !== undefined && hasOwn(obj, key);
   }
@@ -80,7 +80,7 @@ export const object_hasOwn: /* @__PURE__ */ (obj: unknown, key: PropertyKey) => 
  * @example objectHasKeys({}) === false
  * @example objectHasKeys({ a: 1 }) === true
  */
-export const object_hasKeys = /* @__PURE__ */ (obj: unknown, recursePrototype?: boolean): obj is object => {
+export const object_hasKeys = /*@__PURE__*/ (obj: unknown, recursePrototype?: boolean): obj is object => {
   if (typeof obj === "object" && obj !== null) {
     for (const key in obj) {
       if (recursePrototype || object_hasOwn(obj, key)) {
@@ -92,7 +92,7 @@ export const object_hasKeys = /* @__PURE__ */ (obj: unknown, recursePrototype?: 
 };
 
 /** Finds a property descriptor in an object or its prototypes */
-export const object_findPropertyDescriptor = /* @__PURE__ */ (
+export const object_findPropertyDescriptor = /*@__PURE__*/ (
   obj: unknown,
   key: PropertyKey,
 ): PropertyDescriptor | undefined => {
@@ -220,7 +220,7 @@ function _dtoEquals(this: _DTOEqualsSet, a: UnsafeAny, b: UnsafeAny) {
 /**
  * Simple comparison of two DTOs plain objects. It supports circular references.
  */
-export const dto_equals = /* @__PURE__ */ (obj1: UnsafeAny, obj2: UnsafeAny): boolean => {
+export const dto_equals = /*@__PURE__*/ (obj1: UnsafeAny, obj2: UnsafeAny): boolean => {
   const visited = new Set() as _DTOEqualsSet;
   visited.x = _dtoEquals;
   return visited.x(obj1, obj2);
@@ -290,7 +290,7 @@ function _dtoClone(this: _DTOCloneMap, obj: UnsafeAny) {
  * @param obj The object to clone
  * @returns A clone of the given object
  */
-export const dto_clone = /* @__PURE__ */ (obj: UnsafeAny): UnsafeAny => {
+export const dto_clone = /*@__PURE__*/ (obj: UnsafeAny): UnsafeAny => {
   const map = new Map() as _DTOCloneMap;
   map.x = _dtoClone;
   return map.x(obj);

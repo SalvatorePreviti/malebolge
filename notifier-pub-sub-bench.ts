@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import type { NotifierPubSub, NotifierUnsub } from "./packages/core/core";
-import { notifierPubSub_new } from "./packages/core/core";
+import { notifierPubSubList_new, notifierPubSub_new } from "./packages/core/core";
 
 const SIZE = 2000000;
 

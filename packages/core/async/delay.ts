@@ -1,5 +1,4 @@
-// Copyright 2018-2023 the Deno authors. All rights reserved. MIT license.
-// This module is browser compatible.
+// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
 
 import type { UnsafeAny } from "../core";
 import { EMPTY_OBJECT } from "../core";
