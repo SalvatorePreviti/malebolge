@@ -128,7 +128,7 @@ let _pubList: NotifierPubSub | null = null;
 let _pubIter: NotifierUnsubNode | null = null;
 
 /** The previous handler being iterated during a publish */
-let _pubValue: NotifierHandler | null | undefined;
+let _pubValue: NotifierHandler | null = null;
 
 /** The head of the publisher enqueued for later processing */
 let _pubHead: PubQueueNode | null = null;
@@ -215,7 +215,7 @@ function publish<TSelf extends NotifierPubSub>(this: TSelf) {
               _pubValue = value;
 
               // Invoke the listener.
-              if (value() === _UNSUBSCRIBE) {
+              if (iter.value() === _UNSUBSCRIBE) {
                 iter(); // Remove the node
               }
             }
@@ -301,14 +301,15 @@ function subscribe<TSelf extends NotifierPubSubWritable>(this: TSelf, handler: N
  * notifier(); // Nothing happens
  */
 export const notifierPubSub_new = (): NotifierPubSub => {
-  const notifier = (handler?: NotifierHandler) => (handler ? notifier._sub(handler) : notifier._pub());
-  notifier.head = null;
-  notifier.tail = null;
-  notifier.size = 0;
-  notifier._pub = publish;
-  notifier._sub = subscribe;
-  notifier._unsub = unsubscribe;
-  return notifier as NotifierPubSub;
+  const notifierPubSub = (handler?: NotifierHandler) =>
+    handler ? notifierPubSub._sub(handler) : notifierPubSub._pub();
+  notifierPubSub.head = null;
+  notifierPubSub.tail = null;
+  notifierPubSub.size = 0;
+  notifierPubSub._pub = publish;
+  notifierPubSub._sub = subscribe;
+  notifierPubSub._unsub = unsubscribe;
+  return notifierPubSub as NotifierPubSub;
 };
 
 /**
