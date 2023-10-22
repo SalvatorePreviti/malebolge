@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import { ChangeEmitter, UNSUBSCRIBE } from "@malebolge/core";
 import { describe, expect, it, test } from "vitest";
 

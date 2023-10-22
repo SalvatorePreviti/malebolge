@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import { AbortError } from "@malebolge/core";
 import { describe, expect, it } from "vitest";
 

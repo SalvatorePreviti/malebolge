@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import type { UnsafeAny } from "@malebolge/core";
 import { BREAK, fnIdentity } from "@malebolge/core";
 

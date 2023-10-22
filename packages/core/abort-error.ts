@@ -1,4 +1,4 @@
-// This code is MIT license, see https://github.com/SalvatorePreviti/malebolge
+// MIT license, https://github.com/SalvatorePreviti/malebolge
 
 import type { Falsy, UnsafeAny } from "./types";
 import { EMPTY_OBJECT } from "./objects";

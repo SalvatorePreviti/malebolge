@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import { describe, expect, it } from "vitest";
 import { ObservableState, newDerivedObservableState, newLazyObservableState } from "@malebolge/core";
 

@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import type { SimpleArray } from "@malebolge/core";
 import { BREAK } from "@malebolge/core";
 

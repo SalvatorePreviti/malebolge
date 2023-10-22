@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import { describe, expect, it, test } from "vitest";
 import type { UnsafeAny } from "@malebolge/core";
 import {

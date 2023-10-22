@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import { describe, expect, it, vitest, test } from "vitest";
 
 import {

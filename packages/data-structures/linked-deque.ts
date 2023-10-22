@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import {
   linkedList_nodes,
   linkedList_popNode,

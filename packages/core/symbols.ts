@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 /** Symbol for custom object inspection in NodeJS - https://nodejs.org/api/util.html#custom-inspection-functions-on-objects */
 export const NodeInspectSymbol = /*@__PURE__*/ Symbol.for("nodejs.util.inspect.custom");
 

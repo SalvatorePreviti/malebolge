@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 export * from "../core/abort-error";
 
 export * from "./async-delay";

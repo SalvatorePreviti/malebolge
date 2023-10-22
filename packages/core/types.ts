@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 /** false | 0 | "" | null | undefined */
 export type Falsy = false | 0 | "" | null | undefined;
 

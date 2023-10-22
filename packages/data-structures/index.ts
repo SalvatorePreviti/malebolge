@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 export * from "./iterable";
 
 export * from "./array";

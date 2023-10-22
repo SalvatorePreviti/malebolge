@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import { UNSET } from "./symbols";
 import type { UnsafeAny } from "./types";
 

@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import { getWeakRef } from "./fns";
 import { UNSUBSCRIBE } from "./symbols";
 

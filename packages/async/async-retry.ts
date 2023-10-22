@@ -1,7 +1,5 @@
 // MIT license, https://github.com/SalvatorePreviti/malebolge
 
-// MIT license, https://github.com/SalvatorePreviti/malebolge
-
 import { EMPTY_OBJECT, throwIfAborted } from "@malebolge/core";
 import { asyncDelay } from "./async-delay";
 

@@ -1,3 +1,5 @@
+// MIT license, https://github.com/SalvatorePreviti/malebolge
+
 import type { HasChangeEmitter } from "../core/change-emitter";
 import { ChangeEmitter, weakChangeHandler } from "../core/change-emitter";
 import { fnEq } from "./fns";
