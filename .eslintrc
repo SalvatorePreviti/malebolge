@@ -1,6 +1,8 @@
 {
   "extends": ["@balsamic"],
+  "ignorePatterns": ["bench"],
   "rules": {
+    "no-ex-assign": 0,
     "vitest/valid-expect": [1, { "maxArgs": 2 }],
     "no-unused-labels": 0,
     "spaced-comment": [

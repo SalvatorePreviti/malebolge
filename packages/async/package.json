@@ -1,11 +1,11 @@
 {
-  "name": "@malebolge/core",
+  "name": "@malebolge/async",
   "version": "0.0.0",
-  "description": "Core library",
+  "description": "Data structures library",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SalvatorePreviti/malebolge.git",
-    "directory": "packages/core"
+    "directory": "packages/async"
   },
   "keywords": [
     "malebolge",
@@ -20,6 +20,9 @@
   "bugs": {
     "url": "https://github.com/SalvatorePreviti/malebolge/issues"
   },
-  "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/core/#readme",
-  "private": true
+  "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/async/#readme",
+  "private": true,
+  "peerDependencies": {
+    "@malebolge/core": "^0.0.0"
+  }
 }
