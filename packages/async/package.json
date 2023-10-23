@@ -1,7 +1,7 @@
 {
   "name": "@malebolge/async",
-  "version": "0.0.0",
-  "description": "Data structures library",
+  "version": "0.0.1",
+  "description": "Async library",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SalvatorePreviti/malebolge.git",
@@ -21,7 +21,9 @@
     "url": "https://github.com/SalvatorePreviti/malebolge/issues"
   },
   "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/async/#readme",
-  "private": true,
+  "type": "commonjs",
+  "browser": "./dist/index.mjs",
+  "typings": "./dist/index.d.ts",
   "peerDependencies": {
     "@malebolge/core": "^0.0.0"
   }

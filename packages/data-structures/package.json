@@ -1,7 +1,7 @@
 {
   "name": "@malebolge/data-structures",
   "version": "0.0.0",
-  "description": "Core",
+  "description": "Data structures",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SalvatorePreviti/malebolge.git",
@@ -22,6 +22,9 @@
   },
   "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/data-structures/#readme",
   "private": true,
+  "type": "commonjs",
+  "browser": "./dist/index.mjs",
+  "typings": "./dist/index.d.ts",
   "peerDependencies": {
     "@malebolge/core": "^0.0.0"
   }

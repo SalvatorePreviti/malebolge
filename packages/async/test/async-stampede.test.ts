@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AsyncStampede } from "@malebolge/async";
-import { fnUndefined } from "@malebolge/core";
+import { AsyncStampede, asyncDelay } from "@malebolge/async";
+import { TimeoutError, AbortError, fnUndefined } from "@malebolge/core";
 
 describe("asyncStampede", () => {
   it("returns a function that returns a promise", async () => {
@@ -61,7 +61,7 @@ describe("asyncStampede", () => {
     expect(counter).toBe(1);
   });
 
-  it("invokes onChange in all possible status changes", async () => {
+  it("invokes onChange", async () => {
     let onChangeInvoke = 0;
     const fn = new AsyncStampede(async () => 1);
 
@@ -92,34 +92,7 @@ describe("asyncStampede", () => {
     expect(onChangeInvoke).toBe(6);
   });
 
-  it("aborts with abort signals", async () => {
-    const abortController = new AbortController();
-    const fn = new AsyncStampede(async () => 1);
-    fn.attachAbortSignal(abortController.signal);
-
-    expect(await fn()).toBe(1);
-
-    abortController.abort();
-
-    let error1: unknown;
-    let error2: unknown;
-    try {
-      await fn();
-    } catch (e) {
-      error1 = e;
-    }
-
-    try {
-      await fn();
-    } catch (e) {
-      error2 = e;
-    }
-
-    expect(error1).toBeInstanceOf(DOMException);
-    expect(error1).toBe(error2);
-  });
-
-  it("invokes onStart, onResolve and onReject", async () => {
+  it("invokes callbacks", async () => {
     let changeCount = 0;
     let invokeCount = 0;
     let onBeforeStartInvoke = 0;
@@ -159,7 +132,7 @@ describe("asyncStampede", () => {
         onAbort: (reason) => {
           abortedReasons.push(reason);
         },
-        onFinally: (success) => {
+        onSettled: (success) => {
           if (success) {
             ++onFinallySuccess;
           } else {
@@ -328,5 +301,237 @@ describe("asyncStampede", () => {
     await expect(promise).rejects.toThrow("test1");
 
     await expect(fn()).resolves.toBe(2);
+  });
+
+  it("allow to resolve during a reject", async () => {
+    const fn = new AsyncStampede<number>(async () => Promise.reject(new Error("test")), {
+      onReject() {
+        fn.resolve(100);
+      },
+    });
+    const promise = fn();
+    expect(fn.running).toBe(true);
+    expect(fn.promise).not.toBeNull();
+    expect(await promise).toBe(100);
+  });
+
+  it("allow to restart during a reject", async () => {
+    let counter = 0;
+    const fn = new AsyncStampede<number>(
+      async () => {
+        if (++counter < 3) {
+          throw new Error("test");
+        }
+        return counter;
+      },
+      {
+        onReject() {
+          if (counter < 5) {
+            fn.restartSync();
+          }
+        },
+      },
+    );
+    const promise = fn();
+    expect(fn.running).toBe(true);
+    expect(fn.promise).not.toBeNull();
+    expect(await promise).toBe(3);
+  });
+
+  describe("retry", () => {
+    it("can retry a promise", async () => {
+      let counter = 0;
+      const fn = new AsyncStampede<number>(
+        async () => {
+          if (++counter < 3) {
+            throw new Error("test");
+          }
+          return counter;
+        },
+        { retry: { attempts: 4, backoff: 1, jitter: 0, minTimeout: 1, maxTimeout: 5 } },
+      );
+      const promise = fn();
+      expect(fn.retryAttempt).toBe(0);
+      expect(fn.running).toBe(true);
+      expect(fn.promise).not.toBeNull();
+      expect(await promise).toBe(3);
+      expect(fn.running).toBe(false);
+      expect(fn.retryAttempt).toBe(2);
+    });
+
+    it("can abort a promise while is retrying", async () => {
+      const deferred = asyncDelay(null);
+      let counter = 0;
+      const fn = new AsyncStampede<number>(
+        async () => {
+          await asyncDelay(5);
+          if (++counter > 1) {
+            deferred.resolve();
+          }
+          throw new Error("test");
+        },
+        { retry: { attempts: 4, backoff: 1000, jitter: 0, minTimeout: 1, maxTimeout: 50000 } },
+      );
+      const promise = fn();
+      expect(fn.running).toBe(true);
+      expect(fn.promise).not.toBeNull();
+      await deferred;
+      fn.abort(new Error("aborted"));
+      await expect(promise).rejects.toThrow("aborted");
+      expect(fn.retryAttempt).toBe(1);
+      expect(counter).toBe(2);
+
+      fn.clearAbort();
+      expect(await fn.start(() => 412)).toBe(412);
+      expect(fn.retryAttempt).toBe(0);
+    });
+
+    it('can trigger a retry with "triggerRetry" method', async () => {
+      const deferred = asyncDelay(null);
+      let counter = 0;
+      const fn = new AsyncStampede<number>(
+        async () => {
+          if (++counter < 2) {
+            deferred.resolve();
+            throw new Error("test");
+          }
+          return counter;
+        },
+        { retry: { attempts: 4, backoff: 1, jitter: 0, minTimeout: 100000, maxTimeout: 100000 } },
+      );
+      const promise = fn();
+      await deferred;
+      fn.triggerRetry();
+      expect(await promise).toBe(2);
+      expect(fn.running).toBe(false);
+      expect(fn.retryAttempt).toBe(1);
+    });
+  });
+
+  describe("timeout", () => {
+    it("resolve normally if timeout does not exceed", async () => {
+      const fn = new AsyncStampede<number>(async () => asyncDelay(1, 1), { timeout: 1000 });
+      const promise = fn();
+      expect(fn.running).toBe(true);
+      expect(await promise).toBe(1);
+    });
+
+    it("rejects the promise if timeout exceeds", async () => {
+      const fn = new AsyncStampede<number>(async () => asyncDelay(1000, 1), { timeout: 1 });
+      const promise = fn();
+      expect(fn.running).toBe(true);
+      await expect(promise).rejects.toThrow(TimeoutError.message);
+    });
+  });
+
+  describe("throttle", () => {
+    it("throttle the execution of the function", async () => {
+      let counter = 0;
+      const fn = new AsyncStampede<number>(async () => ++counter, { throttle: 100 });
+      const promise1 = fn();
+      const promise2 = fn();
+      const promise3 = fn();
+      expect(fn.running).toBe(true);
+      expect(await promise1).toBe(1);
+      expect(await promise2).toBe(1);
+      expect(await promise3).toBe(1);
+      expect(fn.running).toBe(false);
+      expect(counter).toBe(1);
+    });
+
+    it("throttle the execution of the function with a custom throttle function", async () => {
+      let counter = 0;
+      const fn = new AsyncStampede<number>(async () => ++counter, {
+        throttle: () => 100,
+      });
+      const promise1 = fn();
+      const promise2 = fn();
+      const promise3 = fn();
+      expect(fn.running).toBe(true);
+      expect(await promise1).toBe(1);
+      expect(await promise2).toBe(1);
+      expect(await promise3).toBe(1);
+      expect(fn.running).toBe(false);
+      expect(counter).toBe(1);
+    });
+  });
+
+  describe("abort", () => {
+    it("exposes a signal", async () => {
+      const abortController = new AbortController();
+      const fn = new AsyncStampede(async () => 1);
+      fn.attachAbortSignal(abortController.signal);
+
+      expect(fn.signal).toBeInstanceOf(AbortSignal);
+
+      expect(await fn()).toBe(1);
+
+      abortController.abort();
+
+      let error1: unknown;
+      let error2: unknown;
+      try {
+        await fn();
+      } catch (e) {
+        error1 = e;
+      }
+
+      try {
+        await fn();
+      } catch (e) {
+        error2 = e;
+      }
+
+      expect(error1).toBeInstanceOf(DOMException);
+      expect(error1).toBe(error2);
+    });
+
+    it("is aborted when the promise is aborted", async () => {
+      const fn = new AsyncStampede<number>(async () => asyncDelay(1000, 1), { timeout: 1 });
+      const promise = fn();
+      expect(fn.running).toBe(true);
+      expect(fn.signal.aborted).toBe(false);
+      let abortCount = 0;
+      fn.signal.addEventListener("abort", () => {
+        ++abortCount;
+      });
+      fn.abort();
+      expect(fn.signal.aborted).toBe(true);
+      await expect(promise).rejects.toThrow(AbortError.message);
+      expect(abortCount).toBe(1);
+      fn.abort();
+      expect(abortCount).toBe(1);
+      fn.clearAbort();
+      expect(fn.signal.aborted).toBe(false);
+      expect(fn.abortReason).toBeUndefined();
+      expect(abortCount).toBe(1);
+      const error2 = new Error();
+      fn.abort(error2);
+      expect(abortCount).toBe(2);
+      expect(fn.signal.aborted).toBe(true);
+      expect(fn.abortReason).toBe(error2);
+    });
+  });
+
+  describe("cacheFor", () => {
+    it("should cache the value for the specified time", async () => {
+      let counter = 0;
+      const fn = new AsyncStampede<number>(async () => ++counter, { cacheFor: 70 });
+      const promise1 = fn();
+      const promise2 = fn();
+      const promise3 = fn();
+      expect(fn.running).toBe(true);
+      expect(await promise1).toBe(1);
+      expect(await promise2).toBe(1);
+      expect(await promise3).toBe(1);
+      expect(fn.running).toBe(false);
+      expect(counter).toBe(1);
+      expect(fn.isCacheExpired()).toBe(false);
+      await asyncDelay(80);
+      expect(fn.isCacheExpired()).toBe(true);
+      expect(fn.promise).toBeNull();
+      expect(await fn()).toBe(2);
+      expect(counter).toBe(2);
+    });
   });
 });

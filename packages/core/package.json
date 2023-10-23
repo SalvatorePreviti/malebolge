@@ -21,5 +21,8 @@
     "url": "https://github.com/SalvatorePreviti/malebolge/issues"
   },
   "homepage": "https://github.com/SalvatorePreviti/malebolge/packages/core/#readme",
-  "private": true
+  "private": true,
+  "type": "commonjs",
+  "browser": "./dist/index.mjs",
+  "typings": "./dist/index.d.ts"
 }

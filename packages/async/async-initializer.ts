@@ -17,20 +17,23 @@ export class AsyncInitializer<T> extends AsyncStampede<T> {
 
   public constructor(starter?: AsyncStampedeStarter<T> | undefined, options?: Readonly<AsyncInitializerOptions<T>>) {
     super(starter, options as AsyncStampedeOptions<T>);
+    if (options?.cacheFor === undefined) {
+      this.cacheFor = true;
+    }
   }
 
   /** The resolved value of the promise. Is undefined if the promise is not resolved. */
   public get value(): T | undefined {
+    if (this.isCacheExpired()) {
+      this.#value = undefined;
+      return undefined;
+    }
     return this.#value;
   }
 
   /** The rejected error of the promise. Is null if the promise is not rejected. */
   public get error(): unknown | null {
     return this.#error;
-  }
-
-  public override reject(reason: unknown): boolean {
-    return this.promise ? super.reject(reason) : this.resolve(Promise.reject(reason));
   }
 
   protected override onStart(promise: Promise<T>): void {
@@ -47,10 +50,5 @@ export class AsyncInitializer<T> extends AsyncStampede<T> {
     this.#value = undefined;
     this.#error = reason;
     super.onReject(reason);
-  }
-
-  protected override onFinally(success: boolean): boolean {
-    super.onFinally(false);
-    return !success;
   }
 }

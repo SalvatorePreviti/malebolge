@@ -1,6 +1,6 @@
 // MIT license, https://github.com/SalvatorePreviti/malebolge
 
-import { EMPTY_OBJECT, throwIfAborted } from "@malebolge/core";
+import { EMPTY_OBJECT } from "@malebolge/core";
 import { asyncDelay } from "./async-delay";
 
 export type AsyncRetryStartHandler = (attempt: number, attempts: number) => void;
@@ -9,22 +9,12 @@ export type AsyncRetryResolveHandler<T = unknown> = (value: T, attempt: number, 
 
 export type AsyncRetryErrorHandler = (error: unknown, attempt: number, attempts: number) => void;
 
-export const RETRY_BACKOFF = 2;
-
-export const RETRY_ATTEMPTS = 5;
-
-export const RETRY_MIN_TIMEOUT = 250;
-
-export const RETRY_MAX_TIMEOUT = 10000;
-
-export const RETRY_JITTER = 0.1;
-
-export interface AsyncRetryOptions<T = unknown> {
-  /** Exponential backoff multiplier. Default is 2. */
-  backoff?: number;
-
-  /** The maximum amount of attempts until failure. Default is 5. */
+export interface RetryOptions {
+  /** The maximum amount of attempts until failure. */
   attempts?: number;
+
+  /** Exponential backoff multiplier. */
+  backoff?: number;
 
   /** The initial and minimum amount of milliseconds between attempts. */
   minTimeout?: number;
@@ -34,6 +24,67 @@ export interface AsyncRetryOptions<T = unknown> {
 
   /** Amount of jitter to introduce to the time between attempts, from 0 to 1. */
   jitter?: number;
+}
+
+export const defaultRetryOptions = {
+  attempts: 3,
+  backoff: 2,
+  minTimeout: 150,
+  maxTimeout: 10000,
+  jitter: 0.1,
+} satisfies RetryOptions;
+
+export const getRetryOptions = (options: RetryOptions | boolean | null = defaultRetryOptions) => {
+  if (!options) {
+    return null;
+  }
+  let {
+    attempts = defaultRetryOptions.attempts,
+    minTimeout = defaultRetryOptions.minTimeout,
+    maxTimeout = defaultRetryOptions.maxTimeout,
+    backoff = defaultRetryOptions.backoff,
+    jitter = defaultRetryOptions.jitter,
+  } = options === true ? defaultRetryOptions : options;
+  if (minTimeout > maxTimeout) {
+    minTimeout = maxTimeout;
+  }
+  return { attempts, minTimeout, maxTimeout, backoff, jitter };
+};
+
+export const calculateRetryTimeout = (
+  attempt: number,
+  options: RetryOptions | boolean | null = defaultRetryOptions,
+): number | null => {
+  if (!options) {
+    return null;
+  }
+  if (options === true) {
+    options = defaultRetryOptions;
+  }
+  let {
+    attempts = defaultRetryOptions.attempts,
+    minTimeout = defaultRetryOptions.minTimeout,
+    maxTimeout = defaultRetryOptions.maxTimeout,
+    backoff = defaultRetryOptions.backoff,
+    jitter = defaultRetryOptions.jitter,
+  } = options;
+  if (attempt + 1 >= attempts) {
+    return null;
+  }
+  if (minTimeout > maxTimeout) {
+    minTimeout = maxTimeout;
+  }
+  let ms = minTimeout * backoff ** attempt;
+  if (maxTimeout < ms) {
+    ms = maxTimeout;
+  }
+  ms = jitter ? (1 - jitter * Math.random()) * ms : ms;
+  return ms;
+};
+
+export interface AsyncRetryOptions<T = unknown> extends RetryOptions {
+  /** Signal used to abort the retry */
+  signal?: AbortSignal | null | undefined;
 
   /**
    * Called every time when the promise is retried.
@@ -55,50 +106,29 @@ export interface AsyncRetryOptions<T = unknown> {
    * @param attempt The current attempt number.
    */
   onReject?: AsyncRetryErrorHandler | null | undefined;
-
-  /** Signal used to abort the retry */
-  signal?: AbortSignal | null | undefined;
 }
 
 export async function asyncRetry<T>(
   fn: (() => Promise<T>) | (() => T),
-  {
-    backoff = RETRY_BACKOFF,
-    attempts = RETRY_ATTEMPTS,
-    minTimeout = RETRY_MIN_TIMEOUT,
-    maxTimeout = RETRY_MAX_TIMEOUT,
-    jitter = RETRY_JITTER,
-    onStart,
-    onResolve,
-    onReject: onError = throwIfAborted,
-    signal,
-  }: Readonly<AsyncRetryOptions<T>> = EMPTY_OBJECT,
+  options: Readonly<AsyncRetryOptions<T>> = EMPTY_OBJECT,
 ) {
-  if (minTimeout > maxTimeout) {
-    minTimeout = maxTimeout;
-  }
-
   let attempt = 0;
   for (; ; ++attempt) {
-    throwIfAborted(signal);
+    const { signal, attempts = defaultRetryOptions.attempts } = options;
+    if (signal && signal.aborted) {
+      throw signal.reason;
+    }
     try {
-      onStart?.(attempt, attempts);
+      options.onStart?.(attempt, attempts);
       const result = await fn();
-      onResolve?.(result, attempt, attempts);
+      options.onResolve?.(result, attempt, attempts);
       return result;
     } catch (error) {
-      onError?.(error, attempt, attempts);
-
-      if (attempt + 1 >= attempts) {
+      options.onReject?.(error, attempt, attempts);
+      const ms = calculateRetryTimeout(attempt, options);
+      if (ms === null) {
         throw error;
       }
-
-      let ms = minTimeout * backoff ** attempt;
-      if (maxTimeout < ms) {
-        ms = maxTimeout;
-      }
-      ms = jitter ? (1 - jitter * Math.random()) * ms : ms;
-
       await asyncDelay(ms, undefined, signal);
     }
   }

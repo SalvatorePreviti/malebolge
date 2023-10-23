@@ -1,4 +1,4 @@
-import { AsyncInitializer } from "@malebolge/async";
+import { AsyncInitializer, asyncDelay } from "@malebolge/async";
 import { describe, expect, it } from "vitest";
 
 describe("AsyncInitializer", () => {
@@ -203,5 +203,26 @@ describe("AsyncInitializer", () => {
 
     initializer.reject(new Error("test"));
     expect(initializer.value).toBeUndefined();
+  });
+
+  it("supports specifying a cacheFor", async () => {
+    const initializer = new AsyncInitializer(async () => "x", { cacheFor: 70 });
+    expect(initializer.value).toBeUndefined();
+    initializer.resolve("y");
+    expect(initializer.value).toBe("y");
+    expect(initializer.error).toBeNull();
+    expect(initializer.running).toBe(false);
+    expect(await initializer()).toBe("y");
+    initializer.resolve(Promise.resolve("z"));
+    expect(await initializer()).toBe("z");
+    expect(await initializer()).toBe("z");
+
+    initializer.reject(new Error("test"));
+    expect(initializer.value).toBeUndefined();
+
+    await asyncDelay(80);
+
+    expect(initializer.value).toBeUndefined();
+    expect(initializer.promise).toBeNull();
   });
 });

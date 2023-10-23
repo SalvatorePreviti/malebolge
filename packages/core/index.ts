@@ -8,7 +8,9 @@ export * from "./fns";
 
 export * from "./objects";
 
-export * from "./abort-error";
+export * from "./errors/abort-error";
+
+export * from "./errors/timeout-error";
 
 export * from "./change-emitter";
 

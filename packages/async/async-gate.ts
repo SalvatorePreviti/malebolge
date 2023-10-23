@@ -1,6 +1,6 @@
 // MIT license, https://github.com/SalvatorePreviti/malebolge
 
-import type { AsyncStampedeOptions } from "./async-stampede";
+import type { AsyncStampedeOptions, AsyncStampedeStarter } from "./async-stampede";
 import { AsyncStampede } from "./async-stampede";
 
 export interface AsyncGateOptions<TSignal = void, TLockValue = boolean>
@@ -33,7 +33,7 @@ export class AsyncGate<TSignal = void, TLockValue = boolean> extends AsyncStampe
   }
 
   public constructor(locked: TLockValue, options?: Readonly<AsyncGateOptions<TSignal, TLockValue>>) {
-    super(() => this.waitUnlocked(), options as AsyncStampedeOptions<TSignal | undefined> | undefined);
+    super(null, options as AsyncStampedeOptions<TSignal | undefined> | undefined);
     this.#locked = locked;
   }
 
@@ -70,21 +70,31 @@ export class AsyncGate<TSignal = void, TLockValue = boolean> extends AsyncStampe
   }
 
   /** Called when the gate is locked. */
-  protected onLock(value: TLockValue): void {
-    this.options?.onLock?.(value);
+  protected onLock(locked: TLockValue): void {
+    this.options?.onLock?.(locked);
+    this.dispatchEvent?.(Object.assign(new Event("lock"), { self: this, locked }));
   }
 
   /** Called when the gate is unlocked. */
   protected onUnlock(signal: TSignal | undefined): void {
     this.options?.onUnlock?.(signal);
+    this.dispatchEvent?.(Object.assign(new Event("unlock"), { self: this, signal }));
   }
 
-  protected async waitUnlocked(): Promise<TSignal | undefined> {
+  protected override async startPromise(
+    starter: AsyncStampedeStarter<TSignal | undefined> | null | undefined,
+  ): Promise<TSignal | undefined> {
     let result: TSignal | undefined;
     // We run a loop to be sure that the promise is not resolved before the locked state is set to true.
     for (;;) {
       this.throwIfAborted();
       if (!this.locked) {
+        if (starter) {
+          const p = await super.startPromise(starter);
+          if (p !== undefined) {
+            return p;
+          }
+        }
         return result;
       }
       result = await (this.#awaker ??= new Promise((this.#initAwaker ??= this.#initAwakerFn.bind(this))));

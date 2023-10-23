@@ -1,5 +1,19 @@
 // MIT license, https://github.com/SalvatorePreviti/malebolge
 
+let _isFrontend = true;
+let _isBackend = false;
+
+node: {
+  _isBackend = true;
+  _isFrontend = false;
+}
+
+/** True if running in the browser */
+export const isFrontend = _isFrontend;
+
+/** True if running in node or deno */
+export const isBackend = _isBackend;
+
 /** false | 0 | "" | null | undefined */
 export type Falsy = false | 0 | "" | null | undefined;
 
@@ -86,3 +100,29 @@ export interface SimpleArray<T = unknown> {
  */
 export const isIterable = /*@__PURE__*/ <T = unknown>(iterable: unknown): iterable is Iterable<T> =>
   iterable !== undefined && iterable !== null && typeof (iterable as Iterable<T>)[Symbol.iterator] === "function";
+
+export interface TypedEventTarget<TMap> extends EventTarget {
+  addEventListener<K extends keyof TMap>(
+    type: K,
+    listener: (this: TypedEventTarget<TMap>, ev: TMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+
+  addEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject | null,
+    options?: AddEventListenerOptions | boolean,
+  ): void;
+
+  removeEventListener<K extends keyof TMap>(
+    type: K,
+    listener: (this: TypedEventTarget<TMap>, ev: TMap[K]) => unknown,
+    options?: boolean | EventListenerOptions,
+  ): void;
+
+  removeEventListener(
+    type: string,
+    callback: EventListenerOrEventListenerObject | null,
+    options?: EventListenerOptions | boolean,
+  ): void;
+}

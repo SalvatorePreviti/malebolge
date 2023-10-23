@@ -1,7 +1,7 @@
 // MIT license, https://github.com/SalvatorePreviti/malebolge
 
-import type { Falsy, UnsafeAny } from "./types";
-import { EMPTY_OBJECT } from "./objects";
+import type { Falsy, UnsafeAny } from "../types";
+import { EMPTY_OBJECT } from "../objects";
 
 /** Returns true if the given value is an AbortError. */
 export const isAbortError = (value: unknown): value is AbortError =>
